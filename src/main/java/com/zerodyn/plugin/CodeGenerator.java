@@ -1,6 +1,7 @@
 package com.zerodyn.plugin;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
@@ -9,86 +10,85 @@ import java.io.IOException;
  * @since 2025/3/24
  */
 public class CodeGenerator {
-    // Method to generate Entity class code
+    private final String basePath; // 项目根目录
+
+    public CodeGenerator(String basePath) {
+        this.basePath = basePath;
+    }
+
     public void generateEntityClass(DDLParser.Table table) throws IOException {
-        String entityClassCode = generateEntityClassCode(table);
-        writeToFile(table.getName() + "Entity.java", entityClassCode);
+        String code = generateEntityClassCode(table);
+        writeToFile(table.getName() + "Entity.java", code);
     }
 
-    // Method to generate Controller class code
     public void generateControllerClass(DDLParser.Table table) throws IOException {
-        String controllerClassCode = generateControllerClassCode(table);
-        writeToFile(table.getName() + "Controller.java", controllerClassCode);
+        String code = generateControllerClassCode(table);
+        writeToFile(table.getName() + "Controller.java", code);
     }
 
-    // Method to generate Service class code
     public void generateServiceClass(DDLParser.Table table) throws IOException {
-        String serviceClassCode = generateServiceClassCode(table);
-        writeToFile(table.getName() + "Service.java", serviceClassCode);
+        String code = generateServiceClassCode(table);
+        writeToFile(table.getName() + "Service.java", code);
     }
 
-    // Helper method to write generated code to a file
     private void writeToFile(String fileName, String code) throws IOException {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+        // 将文件生成到项目根目录下
+        File file = new File(basePath, fileName);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             writer.write(code);
         }
     }
 
-    // Generate Entity class code
     private String generateEntityClassCode(DDLParser.Table table) {
         StringBuilder code = new StringBuilder();
         code.append("public class ").append(table.getName()).append("Entity {\n");
 
-        for (DDLParser.Column column : table.getColumns()) {
-            code.append("    private ").append(mapColumnType(column.getType())).append(" ")
-                    .append(column.getName()).append(";\n");
-        }
-
-        code.append("\n    // Getters and setters\n");
-        for (DDLParser.Column column : table.getColumns()) {
+        table.getColumns().forEach(column ->
+                code.append("    private ").append(mapColumnType(column.getType()))
+                        .append(" ").append(column.getName()).append(";\n")
+        );
+        code.append("\n    // Getters and Setters\n");
+        table.getColumns().forEach(column -> {
             String capitalized = column.getName().substring(0, 1).toUpperCase() + column.getName().substring(1);
             code.append("    public ").append(mapColumnType(column.getType())).append(" get")
                     .append(capitalized).append("() { return ").append(column.getName()).append("; }\n");
-
             code.append("    public void set").append(capitalized).append("(")
                     .append(mapColumnType(column.getType())).append(" ").append(column.getName())
                     .append(") { this.").append(column.getName()).append(" = ").append(column.getName()).append("; }\n");
-        }
-
+        });
         code.append("}\n");
         return code.toString();
     }
 
-    // Generate Controller class code
     private String generateControllerClassCode(DDLParser.Table table) {
         return "public class " + table.getName() + "Controller {\n" +
                 "    private " + table.getName() + "Service " + table.getName().toLowerCase() + "Service;\n\n" +
                 "    public void getAll" + table.getName() + "() {\n" +
-                "        // Implement get all functionality\n" +
+                "        // TODO: Implement get all functionality\n" +
                 "    }\n" +
                 "}\n";
     }
 
-    // Generate Service class code
     private String generateServiceClassCode(DDLParser.Table table) {
         return "public class " + table.getName() + "Service {\n" +
                 "    public void save" + table.getName() + "(" + table.getName() + "Entity entity) {\n" +
-                "        // Implement save functionality\n" +
+                "        // TODO: Implement save functionality\n" +
                 "    }\n" +
                 "}\n";
     }
 
-    // Helper method to map column types to Java types
     private String mapColumnType(String sqlType) {
         switch (sqlType.toLowerCase()) {
             case "int":
+            case "int(11)":
                 return "int";
-            case "varchar":
+            case "varchar(255)":
                 return "String";
             case "date":
                 return "java.util.Date";
+            // 其它类型默认返回 String，可根据需要扩展
             default:
-                return "String"; // Default type
+                return "String";
         }
     }
 }
