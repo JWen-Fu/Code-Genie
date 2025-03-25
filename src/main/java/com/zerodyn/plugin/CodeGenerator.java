@@ -36,7 +36,7 @@ public class CodeGenerator {
         writeToFile(toCamelCase(table.getName()) + "Service.java", code);
     }
 
-    // Convert table name to camel case
+    // Convert table name to camel case (e.g., "t_user" -> "TUser")
     private String toCamelCase(String name) {
         String[] parts = name.split("_");
         StringBuilder camelCaseName = new StringBuilder();
@@ -54,12 +54,12 @@ public class CodeGenerator {
         }
     }
 
-    // Generate Entity class code dynamically based on columns
+    // Generate Entity class code dynamically based on parsed columns
     private String generateEntityClassCode(DDLParser.Table table) {
         StringBuilder code = new StringBuilder();
         code.append("public class ").append(toCamelCase(table.getName())).append("Entity {\n");
 
-        // Iterate through columns and generate fields dynamically
+        // Dynamically generate fields based on DDL columns
         for (DDLParser.Column column : table.getColumns()) {
             String javaType = fieldTypeMapper.getJavaType(column.getType());
             code.append("    private ").append(javaType).append(" ").append(column.getName()).append(";\n");

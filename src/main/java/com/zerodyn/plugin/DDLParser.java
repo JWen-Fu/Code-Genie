@@ -16,47 +16,42 @@ public class DDLParser {
      * @return Table 对象，包含表名和所有解析到的列；解析失败返回 null
      */
     public Table parseDDL(String ddl) {
-        // 修改正则：允许任意空格，忽略大小写，捕获表名和括号中的内容
+        // 修改正则表达式，确保能捕获完整的表定义，包括字段类型、约束等
         Pattern tablePattern = Pattern.compile(
-                "CREATE\\s+TABLE\\s+`(.*?)`\\s*\\((.*?)\\)\\s*.*?;",
+                "CREATE\\s+TABLE\\s+`?(\\w+)`?\\s*\\((.*?)\\)\\s*;",
                 Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
         Matcher tableMatcher = tablePattern.matcher(ddl);
 
         if (tableMatcher.find()) {
             String tableName = tableMatcher.group(1).trim();
-            String columnsDDL = tableMatcher.group(2);
-            List<Column> columns = parseColumns(columnsDDL);
+            String columnsDDL = tableMatcher.group(2).trim();
+            List<Column> columns = parseColumns(columnsDDL);  // 解析所有列
             return new Table(tableName, columns);
         }
         return null;
     }
 
-    /**
-     * 解析列定义，忽略 PRIMARY KEY、UNIQUE KEY 等约束行
-     * @param columnsDDL 括号内的所有内容
-     * @return 列列表
-     */
     private List<Column> parseColumns(String columnsDDL) {
         List<Column> columns = new ArrayList<>();
-        // 使用正则匹配以 ` 开头的列定义，捕获列名和列类型及其他属性，直到遇到逗号或行尾
+
+        // 修正正则表达式，确保可以匹配每一列定义
+        // 这里的正则表达式将匹配字段名、类型、以及可能的约束（如NOT NULL、DEFAULT等）
+        // 其中允许字段类型包含括号（例如：varchar(255)，int(11)）
         Pattern columnPattern = Pattern.compile(
-                "\\s*`(\\w+)`\\s+([^,]+)(,|$)",
+                "`?(\\w+)`?\\s+([\\w(),]+)(\\s+(.*?))?\\s*(?=,|$)",
                 Pattern.CASE_INSENSITIVE);
         Matcher columnMatcher = columnPattern.matcher(columnsDDL);
 
+        // 循环遍历每一列
         while (columnMatcher.find()) {
-            String colName = columnMatcher.group(1).trim();
-            String colDefinition = columnMatcher.group(2).trim();
-            // 排除以 PRIMARY 或 UNIQUE 开头的约束行（虽然一般不会以 ` 开头）
-            if (colName.equalsIgnoreCase("primary") || colName.equalsIgnoreCase("unique")) {
-                continue;
-            }
-            columns.add(new Column(colName, colDefinition));
+            String columnName = columnMatcher.group(1).trim();
+            String columnType = columnMatcher.group(2).trim();
+            String columnConstraints = columnMatcher.group(4);  // 可能的约束，如NOT NULL、DEFAULT等
+            columns.add(new Column(columnName, columnType, columnConstraints));
         }
         return columns;
     }
 
-    // 内部类：Table 表示解析得到的表信息
     public static class Table {
         private final String name;
         private final List<Column> columns;
@@ -75,14 +70,15 @@ public class DDLParser {
         }
     }
 
-    // 内部类：Column 表示解析得到的列信息
     public static class Column {
         private final String name;
         private final String type;
+        private final String constraints;
 
-        public Column(String name, String type) {
+        public Column(String name, String type, String constraints) {
             this.name = name;
             this.type = type;
+            this.constraints = constraints;
         }
 
         public String getName() {
@@ -91,6 +87,10 @@ public class DDLParser {
 
         public String getType() {
             return type;
+        }
+
+        public String getConstraints() {
+            return constraints;
         }
     }
 }
