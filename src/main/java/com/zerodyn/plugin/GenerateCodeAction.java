@@ -15,7 +15,6 @@ import java.io.IOException;
 public class GenerateCodeAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        // 获取当前项目
         Project project = e.getProject();
         if (project == null) {
             Messages.showErrorDialog("无法获取当前项目。", "错误");
@@ -27,18 +26,17 @@ public class GenerateCodeAction extends AnAction {
             return;
         }
 
-        // 显示自定义对话框获取用户输入
+        // Create a FieldTypeMapper instance
+        FieldTypeMapper fieldTypeMapper = new FieldTypeMapper();
+
+        // Example: Add custom mapping (user can configure as needed)
+        fieldTypeMapper.addMapping("decimal", "java.math.BigDecimal");
+
         GenerateCodeDialog dialog = new GenerateCodeDialog();
         dialog.show();
         if (dialog.isOK()) {
             String ddl = dialog.getDDL();
             String selectedArchitecture = dialog.getSelectedArchitecture();
-
-            // 根据所选架构选择不同处理逻辑，目前MVC与DDD均生成相同代码，但可以在此区分
-            if ("DDD".equalsIgnoreCase(selectedArchitecture)) {
-                // 暂时提示DDD模式与MVC模式生成代码相同，后续可扩展
-                Messages.showInfoMessage("当前为 DDD 模式（注意：生成代码与 MVC 模式相同，后续版本将扩展DDD专属代码）", "提示");
-            }
 
             DDLParser ddlParser = new DDLParser();
             DDLParser.Table table = ddlParser.parseDDL(ddl);
@@ -48,7 +46,7 @@ public class GenerateCodeAction extends AnAction {
                 return;
             }
 
-            CodeGenerator codeGenerator = new CodeGenerator(basePath);
+            CodeGenerator codeGenerator = new CodeGenerator(basePath, fieldTypeMapper);
             try {
                 codeGenerator.generateEntityClass(table);
                 codeGenerator.generateControllerClass(table);
