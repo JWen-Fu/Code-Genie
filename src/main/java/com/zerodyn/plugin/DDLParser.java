@@ -12,21 +12,25 @@ import java.util.regex.Pattern;
 public class DDLParser {
     /**
      * 解析 CREATE TABLE 语句，支持带有额外参数（如 ENGINE、CHARSET、COMMENT 等）的DDL
+     *
      * @param ddl DDL 语句
      * @return Table 对象，包含表名和所有解析到的列；解析失败返回 null
      */
     public Table parseDDL(String ddl) {
-        // 修改正则表达式，确保能捕获完整的表定义，包括字段类型、约束等
-        Pattern tablePattern = Pattern.compile(
-                "CREATE\\s+TABLE\\s+`?(\\w+)`?\\s*\\((.*?)\\)\\s*;",
-                Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
-        Matcher tableMatcher = tablePattern.matcher(ddl);
+        // 移除注释和多余空格
+        String normalizedDDL = ddl.replaceAll("/\\*.*?\\*/", "")
+                .replaceAll("--.*?\\n", "")
+                .replaceAll("\\s+", " ");
 
-        if (tableMatcher.find()) {
-            String tableName = tableMatcher.group(1).trim();
-            String columnsDDL = tableMatcher.group(2).trim();
-            List<Column> columns = parseColumns(columnsDDL);  // 解析所有列
-            return new Table(tableName, columns);
+        Pattern tablePattern = Pattern.compile(
+                "CREATE\\s+TABLE\\s+(?:IF NOT EXISTS\\s+)?`?(\\w+)`?\\s*\\(([^;]+)\\)",
+                Pattern.CASE_INSENSITIVE);
+        Matcher matcher = tablePattern.matcher(normalizedDDL);
+
+        if (matcher.find()) {
+            String tableName = matcher.group(1);
+            String columnsPart = matcher.group(2);
+            return new Table(tableName, parseColumns(columnsPart));
         }
         return null;
     }
@@ -34,22 +38,54 @@ public class DDLParser {
     private List<Column> parseColumns(String columnsDDL) {
         List<Column> columns = new ArrayList<>();
 
-        // 修正正则表达式，确保可以匹配每一列定义
-        // 这里的正则表达式将匹配字段名、类型、以及可能的约束（如NOT NULL、DEFAULT等）
-        // 其中允许字段类型包含括号（例如：varchar(255)，int(11)）
-        Pattern columnPattern = Pattern.compile(
-                "`?(\\w+)`?\\s+([\\w(),]+)(\\s+(.*?))?\\s*(?=,|$)",
+        Pattern pattern = Pattern.compile(
+                "`?(\\w+)`?\\s+([a-z]+\\([\\d,\\s]+\\)|[a-z]+)\\b",
                 Pattern.CASE_INSENSITIVE);
-        Matcher columnMatcher = columnPattern.matcher(columnsDDL);
 
-        // 循环遍历每一列
-        while (columnMatcher.find()) {
-            String columnName = columnMatcher.group(1).trim();
-            String columnType = columnMatcher.group(2).trim();
-            String columnConstraints = columnMatcher.group(4);  // 可能的约束，如NOT NULL、DEFAULT等
-            columns.add(new Column(columnName, columnType, columnConstraints));
+        String[] columnDefs = columnsDDL.split(",(?![^(]*\\))");
+
+        for (String def : columnDefs) {
+            def = def.trim();
+            if (def.startsWith("PRIMARY KEY") || def.startsWith("INDEX") || def.startsWith("UNIQUE")) {
+                continue;
+            }
+
+            Matcher matcher = pattern.matcher(def);
+            if (matcher.find()) {
+                String columnName = snakeToCamel(matcher.group(1)); // 转换命名格式
+                String columnType = matcher.group(2).toUpperCase();
+                columns.add(new Column(columnName, columnType));
+            }
         }
         return columns;
+    }
+
+    /**
+     * 蛇形命名转小驼峰命名（snake_case -> camelCase）
+     * 示例：
+     *   "user_name" -> "userName"
+     *   "total_price" -> "totalPrice"
+     */
+    private String snakeToCamel(String snakeCase) {
+        StringBuilder result = new StringBuilder();
+        boolean nextUpper = false;
+
+        for (int i = 0; i < snakeCase.length(); i++) {
+            char currentChar = snakeCase.charAt(i);
+
+            if (currentChar == '_') {
+                nextUpper = true;
+            } else {
+                if (nextUpper) {
+                    result.append(Character.toUpperCase(currentChar));
+                    nextUpper = false;
+                } else {
+                    result.append(Character.toLowerCase(currentChar));
+                }
+            }
+        }
+
+        return result.toString();
     }
 
     public static class Table {
@@ -73,12 +109,10 @@ public class DDLParser {
     public static class Column {
         private final String name;
         private final String type;
-        private final String constraints;
 
-        public Column(String name, String type, String constraints) {
+        public Column(String name, String type) {
             this.name = name;
             this.type = type;
-            this.constraints = constraints;
         }
 
         public String getName() {
@@ -87,10 +121,6 @@ public class DDLParser {
 
         public String getType() {
             return type;
-        }
-
-        public String getConstraints() {
-            return constraints;
         }
     }
 }
