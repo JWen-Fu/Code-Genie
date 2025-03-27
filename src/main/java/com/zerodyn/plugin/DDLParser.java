@@ -10,91 +10,72 @@ import java.util.regex.Pattern;
  * @since 2025/3/24
  */
 public class DDLParser {
-    /**
-     * 解析 CREATE TABLE 语句，支持带有额外参数（如 ENGINE、CHARSET、COMMENT 等）的DDL
-     *
-     * @param ddl DDL 语句
-     * @return Table 对象，包含表名和所有解析到的列；解析失败返回 null
-     */
     public Table parseDDL(String ddl) {
-        // 移除注释和多余空格
         String normalizedDDL = ddl.replaceAll("/\\*.*?\\*/", "")
                 .replaceAll("--.*?\\n", "")
                 .replaceAll("\\s+", " ");
 
         Pattern tablePattern = Pattern.compile(
-                "CREATE\\s+TABLE\\s+(?:IF NOT EXISTS\\s+)?`?(\\w+)`?\\s*\\(([^;]+)\\)",
+                "CREATE\\s+TABLE\\s+(?:IF NOT EXISTS\\s+)?`?(\\w+)`?\\s*(?:COMMENT\\s+'([^']*)')?\\s*\\(([^;]+)\\)\\s*(?:COMMENT\\s*=\\s*'([^']*)')?",
                 Pattern.CASE_INSENSITIVE);
-        Matcher matcher = tablePattern.matcher(normalizedDDL);
 
+        Matcher matcher = tablePattern.matcher(normalizedDDL);
         if (matcher.find()) {
             String tableName = matcher.group(1);
-            String columnsPart = matcher.group(2);
-            return new Table(tableName, parseColumns(columnsPart));
+            String tableComment = matcher.group(2) != null ? matcher.group(2) :
+                    matcher.group(4) != null ? matcher.group(4) : "";
+            return new Table(tableName, parseColumns(matcher.group(3)), tableComment);
         }
         return null;
     }
 
     private List<Column> parseColumns(String columnsDDL) {
         List<Column> columns = new ArrayList<>();
-
         Pattern pattern = Pattern.compile(
-                "`?(\\w+)`?\\s+([a-z]+\\([\\d,\\s]+\\)|[a-z]+)\\b",
+                "`?(\\w+)`?\\s+([a-z]+\\([\\d,\\s]+\\)|[a-z]+)\\s*(NOT NULL|NULL)?\\s*(DEFAULT\\s+[^,]+)?\\s*(?:COMMENT\\s+'([^']*)')?",
                 Pattern.CASE_INSENSITIVE);
 
         String[] columnDefs = columnsDDL.split(",(?![^(]*\\))");
-
         for (String def : columnDefs) {
             def = def.trim();
-            if (def.startsWith("PRIMARY KEY") || def.startsWith("INDEX") || def.startsWith("UNIQUE")) {
-                continue;
-            }
+            if (def.startsWith("PRIMARY KEY") || def.startsWith("INDEX")) continue;
 
             Matcher matcher = pattern.matcher(def);
             if (matcher.find()) {
-                String columnName = snakeToCamel(matcher.group(1)); // 转换命名格式
-                String columnType = matcher.group(2).toUpperCase();
-                columns.add(new Column(columnName, columnType));
+                columns.add(new Column(
+                        matcher.group(1), // originalName
+                        snakeToCamel(matcher.group(1)), // camelCaseName
+                        matcher.group(2).toUpperCase(), // type
+                        !"NULL".equalsIgnoreCase(matcher.group(3)), // notNull
+                        matcher.group(5) != null ? matcher.group(5) : "" // comment
+                ));
             }
         }
         return columns;
     }
 
-    /**
-     * 蛇形命名转小驼峰命名（snake_case -> camelCase）
-     * 示例：
-     *   "user_name" -> "userName"
-     *   "total_price" -> "totalPrice"
-     */
-    private String snakeToCamel(String snakeCase) {
-        StringBuilder result = new StringBuilder();
-        boolean nextUpper = false;
-
-        for (int i = 0; i < snakeCase.length(); i++) {
-            char currentChar = snakeCase.charAt(i);
-
-            if (currentChar == '_') {
-                nextUpper = true;
+    private String snakeToCamel(String str) {
+        StringBuilder builder = new StringBuilder();
+        for (String s : str.split("_")) {
+            if (builder.length() == 0) {
+                builder.append(s.toLowerCase());
             } else {
-                if (nextUpper) {
-                    result.append(Character.toUpperCase(currentChar));
-                    nextUpper = false;
-                } else {
-                    result.append(Character.toLowerCase(currentChar));
-                }
+                builder.append(s.substring(0, 1).toUpperCase())
+                        .append(s.substring(1).toLowerCase());
             }
         }
-
-        return result.toString();
+        return builder.toString();
     }
 
     public static class Table {
         private final String name;
         private final List<Column> columns;
+        private final String comment;
 
-        public Table(String name, List<Column> columns) {
+        public Table(String name, List<Column> columns, String comment) {
             this.name = name;
             this.columns = columns;
+            this.comment = comment;
         }
 
         public String getName() {
@@ -104,15 +85,29 @@ public class DDLParser {
         public List<Column> getColumns() {
             return columns;
         }
+
+        public String getComment() {
+            return comment;
+        }
     }
 
     public static class Column {
+        private final String originalName;
         private final String name;
         private final String type;
+        private final boolean notNull;
+        private final String comment;
 
-        public Column(String name, String type) {
+        public Column(String originalName, String name, String type, boolean notNull, String comment) {
+            this.originalName = originalName;
             this.name = name;
             this.type = type;
+            this.notNull = notNull;
+            this.comment = comment;
+        }
+
+        public String getOriginalName() {
+            return originalName;
         }
 
         public String getName() {
@@ -121,6 +116,14 @@ public class DDLParser {
 
         public String getType() {
             return type;
+        }
+
+        public boolean isNotNull() {
+            return notNull;
+        }
+
+        public String getComment() {
+            return comment;
         }
     }
 }
