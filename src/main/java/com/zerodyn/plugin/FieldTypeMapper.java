@@ -7,10 +7,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.Properties;
-import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author JWen
@@ -19,7 +21,9 @@ import java.util.stream.Collectors;
 public class FieldTypeMapper {
     private static final String CONFIG_DIR = ".codegen";
     private static final String CONFIG_FILE = "field-mappings.properties";
-    private final Map<String, String> mappings = new HashMap<>();
+    private final Map<String, String> mappings = new LinkedHashMap<>();
+    private static final Pattern TYPE_PATTERN =
+            Pattern.compile("^(\\w+)(?:\\(.*\\))?(?:\\s+UNSIGNED)?$", Pattern.CASE_INSENSITIVE);
 
     public FieldTypeMapper() {
         loadMappings();
@@ -43,13 +47,10 @@ public class FieldTypeMapper {
 
     public void savePartialMappings(Map<String, String> partialMappings) throws IOException {
         partialMappings.forEach((k, v) -> mappings.put(k.toLowerCase(), v));
-        saveToFile();
-    }
 
-    private void saveToFile() throws IOException {
         File configDir = new File(System.getProperty("user.home"), CONFIG_DIR);
         if (!configDir.exists() && !configDir.mkdirs()) {
-            throw new IOException("Failed to create config directory");
+            throw new IOException("无法创建配置目录");
         }
 
         try (OutputStream os = new FileOutputStream(getConfigFile())) {
@@ -59,40 +60,58 @@ public class FieldTypeMapper {
         }
     }
 
+    public String getJavaType(String sqlType) {
+        Matcher matcher = TYPE_PATTERN.matcher(sqlType.trim());
+        if (matcher.find()) {
+            String baseType = matcher.group(1).toLowerCase();
+            if ("tinyint".equals(baseType) && sqlType.toLowerCase().contains("tinyint(1)")) {
+                return "Boolean";
+            }
+            return mappings.getOrDefault(baseType, "Object");
+        }
+        return "Object";
+    }
+
+    public Map<String, String> getRelevantMappings(Set<String> requiredTypes) {
+        Map<String, String> result = new LinkedHashMap<>();
+        requiredTypes.forEach(type -> {
+            String javaType = mappings.getOrDefault(type, "Object");
+            result.put(type, javaType);
+        });
+        return result;
+    }
+
     private File getConfigFile() {
-        return new File(System.getProperty("user.home"), CONFIG_DIR + File.separator + CONFIG_FILE);
+        return new File(System.getProperty("user.home"),
+                CONFIG_DIR + File.separator + CONFIG_FILE);
     }
 
     private void initDefaultMappings() {
         Map<String, String> defaults = new HashMap<>();
+        // 整数类型
+        defaults.put("tinyint", "Integer");
+        defaults.put("smallint", "Integer");
+        defaults.put("mediumint", "Integer");
+        defaults.put("int", "Integer");
+        defaults.put("integer", "Integer");
+        defaults.put("bigint", "Long");
+        // 布尔类型
+        defaults.put("boolean", "Boolean");
+        // 字符串类型
         defaults.put("varchar", "String");
         defaults.put("char", "String");
         defaults.put("text", "String");
-        defaults.put("int", "Integer");
-        defaults.put("integer", "Integer");
-        defaults.put("tinyint", "Integer");
+        // 小数类型
         defaults.put("decimal", "java.math.BigDecimal");
+        defaults.put("numeric", "java.math.BigDecimal");
         defaults.put("float", "Float");
         defaults.put("double", "Double");
+        // 日期时间
         defaults.put("date", "java.time.LocalDate");
+        defaults.put("time", "java.time.LocalTime");
         defaults.put("datetime", "java.time.LocalDateTime");
+        defaults.put("timestamp", "java.time.Instant");
+
         mappings.putAll(defaults);
-    }
-
-    public String getJavaType(String sqlType) {
-        String baseType = sqlType.split("\\(")[0].toLowerCase();
-        return mappings.getOrDefault(baseType, "Object");
-    }
-
-    public Map<String, String> getAllMappings() {
-        return new HashMap<>(mappings);
-    }
-
-    public Map<String, String> getRelevantMappings(Set<String> requiredTypes) {
-        return requiredTypes.stream()
-                .collect(Collectors.toMap(
-                        type -> type,
-                        type -> mappings.getOrDefault(type, "Object"))
-                );
     }
 }

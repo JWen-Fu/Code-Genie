@@ -10,6 +10,12 @@ import java.util.regex.Pattern;
  * @since 2025/3/24
  */
 public class DDLParser {
+    // 定义合法的SQL数据类型列表（防止误判key等关键字）
+    private static final String SQL_DATA_TYPES =
+            "int|integer|tinyint|smallint|mediumint|bigint|decimal|numeric|float|double|" +
+                    "char|varchar|text|tinytext|mediumtext|longtext|blob|tinyblob|mediumblob|longblob|" +
+                    "datetime|date|time|year|timestamp|boolean|bit|enum|set|json";
+
     public Table parseDDL(String ddl) {
         String normalizedDDL = ddl.replaceAll("/\\*.*?\\*/", "")
                 .replaceAll("--.*?\\n", "")
@@ -31,27 +37,51 @@ public class DDLParser {
 
     private List<Column> parseColumns(String columnsDDL) {
         List<Column> columns = new ArrayList<>();
+
+        // 改进后的正则：确保只匹配合法的SQL数据类型
         Pattern pattern = Pattern.compile(
-                "`?(\\w+)`?\\s+([a-z]+\\([\\d,\\s]+\\)|[a-z]+)\\s*(NOT NULL|NULL)?\\s*(DEFAULT\\s+[^,]+)?\\s*(?:COMMENT\\s+'([^']*)')?",
+                "`?(\\w+)`?\\s+" +
+                        "(" + SQL_DATA_TYPES + ")\\s*" + // 只匹配预定义的数据类型
+                        "(?:\\([\\d,\\s]+\\))?\\s*" +   // 可选的长度定义
+                        "(UNSIGNED\\s*)?" +
+                        "(NOT NULL|NULL)?\\s*" +
+                        "(DEFAULT\\s+[^,]+)?\\s*" +
+                        "(?:COMMENT\\s+'([^']*)')?",
                 Pattern.CASE_INSENSITIVE);
 
         String[] columnDefs = columnsDDL.split(",(?![^(]*\\))");
         for (String def : columnDefs) {
             def = def.trim();
-            if (def.startsWith("PRIMARY KEY") || def.startsWith("INDEX")) continue;
+            if (isConstraintDefinition(def)) continue;
 
             Matcher matcher = pattern.matcher(def);
             if (matcher.find()) {
+                // 构建完整的类型字符串（包含长度定义）
+                String fullType = matcher.group(2).toUpperCase();
+                if (def.contains("(")) {
+                    int start = def.indexOf("(");
+                    int end = def.indexOf(")");
+                    if (end > start) {
+                        fullType += def.substring(start, end + 1);
+                    }
+                }
+
                 columns.add(new Column(
                         matcher.group(1), // originalName
                         snakeToCamel(matcher.group(1)), // camelCaseName
-                        matcher.group(2).toUpperCase(), // type
-                        !"NULL".equalsIgnoreCase(matcher.group(3)), // notNull
-                        matcher.group(5) != null ? matcher.group(5) : "" // comment
+                        fullType, // 完整的类型定义
+                        !"NULL".equalsIgnoreCase(matcher.group(4)), // notNull
+                        matcher.group(6) != null ? matcher.group(6) : "" // comment
                 ));
             }
         }
         return columns;
+    }
+
+    // 判断是否是约束定义（增强版）
+    private boolean isConstraintDefinition(String definition) {
+        return definition.matches("(?i)^\\s*(PRIMARY\\s+KEY|UNIQUE\\s+(?:KEY|INDEX)?|" +
+                "FOREIGN\\s+KEY|INDEX|KEY|CONSTRAINT|CHECK)\\b.*");
     }
 
     private String snakeToCamel(String str) {
