@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) by Zerodyn Technologies 2025-2025. All rights reserved.
+ */
+
 package com.zerodyn.plugin;
 
 import java.util.ArrayList;
@@ -52,7 +56,9 @@ public class DDLParser {
         String[] columnDefs = columnsDDL.split(",(?![^(]*\\))");
         for (String def : columnDefs) {
             def = def.trim();
-            if (isConstraintDefinition(def)) continue;
+            if (isConstraintDefinition(def)) {
+                continue;
+            }
 
             Matcher matcher = pattern.matcher(def);
             if (matcher.find()) {
@@ -67,11 +73,16 @@ public class DDLParser {
                 }
 
                 columns.add(new Column(
-                        matcher.group(1), // originalName
-                        snakeToCamel(matcher.group(1)), // camelCaseName
-                        fullType, // 完整的类型定义
-                        !"NULL".equalsIgnoreCase(matcher.group(4)), // notNull
-                        matcher.group(6) != null ? matcher.group(6) : "" // comment
+                        // originalName
+                        matcher.group(1),
+                        // camelCaseName
+                        snakeToCamel(matcher.group(1)),
+                        // 完整的类型定义
+                        fullType,
+                        // notNull
+                        !"NULL".equalsIgnoreCase(matcher.group(4)),
+                        // comment
+                        matcher.group(6) != null ? matcher.group(6) : ""
                 ));
             }
         }
@@ -87,7 +98,7 @@ public class DDLParser {
     private String snakeToCamel(String str) {
         StringBuilder builder = new StringBuilder();
         for (String s : str.split("_")) {
-            if (builder.length() == 0) {
+            if (builder.isEmpty()) {
                 builder.append(s.toLowerCase());
             } else {
                 builder.append(s.substring(0, 1).toUpperCase())

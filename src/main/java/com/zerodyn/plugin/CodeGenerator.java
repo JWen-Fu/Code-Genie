@@ -1,118 +1,166 @@
+/*
+ * Copyright (c) by Zerodyn Technologies 2025-2025. All rights reserved.
+ */
+
 package com.zerodyn.plugin;
 
+import com.zerodyn.plugin.config.ComponentConfig;
+import com.zerodyn.plugin.config.DDDConfiguration;
+import com.zerodyn.plugin.config.LayerConfig;
+import com.zerodyn.plugin.template.TemplateInitializer;
+import com.zerodyn.plugin.template.TemplateManager;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+import groovy.util.logging.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author JWen
  * @since 2025/3/24
  */
+@Slf4j
 public class CodeGenerator {
+    private static final Logger log = LoggerFactory.getLogger(CodeGenerator.class);
     private final String basePath;
     private final FieldTypeMapper typeMapper;
     private final boolean useLombok;
+    private final DDDConfiguration dddConfig;
+    private final TemplateManager templateManager;
 
-    public CodeGenerator(String basePath, FieldTypeMapper typeMapper, boolean useLombok) {
+    public CodeGenerator(String basePath,
+                         FieldTypeMapper typeMapper,
+                         boolean useLombok,
+                         DDDConfiguration dddConfig) throws IOException {
         this.basePath = basePath;
         this.typeMapper = typeMapper;
         this.useLombok = useLombok;
+        this.dddConfig = dddConfig;
+
+        try {
+            // 初始化模板系统
+            TemplateInitializer.ensureDefaultTemplates();
+            this.templateManager = TemplateInitializer.createDefaultTemplateManager();
+        } catch (TemplateException e) {
+            throw new IOException("Failed to initialize template system", e);
+        }
+
+        ensureBaseDirectoryExists();
+    }
+
+    private void ensureBaseDirectoryExists() throws IOException {
+        Path path = Paths.get(basePath);
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
+        }
     }
 
     public void generateAll(DDLParser.Table table) throws IOException {
-        generateEntityClass(table);
-        generateServiceClass(table);
-        generateControllerClass(table);
+        generateDDDCode(table);
     }
 
-    public void generateEntityClass(DDLParser.Table table) throws IOException {
-        String code = buildEntityCode(table);
-        writeFile(toCamelCase(table.getName()) + "Entity.java", code);
-    }
+    private void generateDDDCode(DDLParser.Table table) throws IOException {
+        // 使用安全的组件获取方式
+        Map<String, Map<String, ComponentConfig>> allComponents =
+                dddConfig.getAllValidComponents();
 
-    public void generateServiceClass(DDLParser.Table table) throws IOException {
-        String code = buildServiceCode(table);
-        writeFile(toCamelCase(table.getName()) + "Service.java", code);
-    }
+        // 按固定顺序处理各层
+        List<String> layerOrder = Arrays.asList(
+                "domain", "application", "infrastructure", "interfaces"
+        );
 
-    public void generateControllerClass(DDLParser.Table table) throws IOException {
-        String code = buildControllerCode(table);
-        writeFile(toCamelCase(table.getName()) + "Controller.java", code);
-    }
-
-    private String buildEntityCode(DDLParser.Table table) {
-        StringBuilder code = new StringBuilder();
-        code.append("package com.example.entity;\n\n");
-        code.append("import javax.persistence.*;\n");
-        if (useLombok) code.append("import lombok.*;\n\n");
-
-        if (!table.getComment().isEmpty()) {
-            code.append("/**\n * ").append(table.getComment()).append("\n */\n");
-        }
-
-        code.append("@Entity\n");
-        code.append("@Table(name = \"").append(table.getName()).append("\")\n");
-        if (useLombok) {
-            code.append("@Data\n@NoArgsConstructor\n@AllArgsConstructor\n");
-        }
-        code.append("public class ").append(toCamelCase(table.getName())).append("Entity {\n\n");
-
-        for (DDLParser.Column column : table.getColumns()) {
-            if (!column.getComment().isEmpty()) {
-                code.append("    /** ").append(column.getComment()).append(" */\n");
+        for (String layer : layerOrder) {
+            Map<String, ComponentConfig> components = allComponents.get(layer);
+            if (components != null) {
+                components.forEach((compType, config) -> {
+                    try {
+                        generateComponent(table, compType, config);
+                    } catch (IOException e) {
+                        log.error("Failed to generate {} for layer {}", compType, layer, e);
+                    }
+                });
             }
-
-            code.append("    @Column(name = \"").append(column.getOriginalName()).append("\"");
-            if (column.isNotNull()) code.append(", nullable = false");
-            code.append(")\n");
-
-            code.append("    private ").append(typeMapper.getJavaType(column.getType())).append(" ").append(column.getName()).append(";\n\n");
         }
-
-        if (!useLombok) {
-            code.append(generateGettersSetters(table));
-        }
-
-        code.append("}\n");
-        return code.toString();
     }
 
-    private String generateGettersSetters(DDLParser.Table table) {
-        StringBuilder code = new StringBuilder();
-        for (DDLParser.Column column : table.getColumns()) {
-            String capitalized = column.getName().substring(0, 1).toUpperCase() + column.getName().substring(1);
+    private void generateComponent(DDLParser.Table table,
+                                   String componentType,
+                                   ComponentConfig config) throws IOException {
+        try {
+            // 准备模板数据
+            Map<String, Object> data = createTemplateData(table);
 
-            code.append("    public ").append(typeMapper.getJavaType(column.getType())).append(" get").append(capitalized).append("() {\n").append("        return this.").append(column.getName()).append(";\n").append("    }\n\n");
+            // 处理模板
+            String content = processTemplate(config.getTemplateFile(), data);
 
-            code.append("    public void set").append(capitalized).append("(").append(typeMapper.getJavaType(column.getType())).append(" ").append(column.getName()).append(") {\n").append("        this.").append(column.getName()).append(" = ").append(column.getName()).append(";\n").append("    }\n\n");
+            // 写入文件
+            writeToFile(
+                    config.getBasePackage(),
+                    toCamelCase(table.getName()) + componentType + ".java",
+                    content
+            );
+
+        } catch (Exception e) {
+            throw new IOException("Failed to generate " + componentType + ": " + e.getMessage(), e);
         }
-        return code.toString();
     }
 
-    private String buildServiceCode(DDLParser.Table table) {
-        return "package com.example.service;\n\n" + "import com.example.entity." + toCamelCase(table.getName()) + "Entity;\n" + "import org.springframework.stereotype.Service;\n\n" + "@Service\n" + "public class " + toCamelCase(table.getName()) + "Service {\n" + "    public void save(" + toCamelCase(table.getName()) + "Entity entity) {\n" + "        // TODO: Implement save logic\n" + "    }\n" + "}\n";
+    private Map<String, Object> createTemplateData(DDLParser.Table table) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("table", table);
+        data.put("config", dddConfig);
+        data.put("typeMapper", typeMapper);
+        data.put("useLombok", useLombok);
+        return data;
     }
 
-    private String buildControllerCode(DDLParser.Table table) {
-        return "package com.example.controller;\n\n" + "import com.example.entity." + toCamelCase(table.getName()) + "Entity;\n" + "import com.example.service." + toCamelCase(table.getName()) + "Service;\n" + "import org.springframework.web.bind.annotation.*;\n\n" + "@RestController\n" + "@RequestMapping(\"/api/" + table.getName().toLowerCase() + "\")\n" + "public class " + toCamelCase(table.getName()) + "Controller {\n" + "    private final " + toCamelCase(table.getName()) + "Service service;\n\n" + "    public " + toCamelCase(table.getName()) + "Controller(" + toCamelCase(table.getName()) + "Service service) {\n" + "        this.service = service;\n" + "    }\n\n" + "    @PostMapping\n" + "    public void create(@RequestBody " + toCamelCase(table.getName()) + "Entity entity) {\n" + "        service.save(entity);\n" + "    }\n" + "}\n";
+    private String processTemplate(String templateName, Map<String, Object> data)
+            throws IOException {
+        try {
+            Template template = templateManager.getTemplate(templateName);
+            StringWriter writer = new StringWriter();
+            template.process(data, writer);
+            return writer.toString();
+        } catch (Exception e) {
+            throw new IOException("Template processing failed: " + templateName, e);
+        }
+    }
+
+    private void writeToFile(String packageName, String fileName, String content)
+            throws IOException {
+        String packagePath = packageName.replace(".", "/");
+        Path outputDir = Paths.get(basePath, packagePath);
+
+        if (!Files.exists(outputDir)) {
+            Files.createDirectories(outputDir);
+        }
+
+        Path outputFile = outputDir.resolve(fileName);
+        try (BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
+            writer.write("package " + packageName + ";\n\n");
+            writer.write(content);
+        }
     }
 
     private String toCamelCase(String name) {
         StringBuilder result = new StringBuilder();
         for (String part : name.split("_")) {
-            if (part.isEmpty()) continue;
-            result.append(part.substring(0, 1).toUpperCase()).append(part.substring(1).toLowerCase());
+            if (!part.isEmpty()) {
+                result.append(Character.toUpperCase(part.charAt(0)))
+                        .append(part.substring(1).toLowerCase());
+            }
         }
         return result.toString();
-    }
-
-    private void writeFile(String fileName, String content) throws IOException {
-        File dir = new File(basePath);
-        if (!dir.exists()) dir.mkdirs();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(dir, fileName)))) {
-            writer.write(content);
-        }
     }
 }

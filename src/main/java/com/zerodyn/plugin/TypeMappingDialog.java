@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) by Zerodyn Technologies 2025-2025. All rights reserved.
+ */
+
 package com.zerodyn.plugin;
 
 import com.intellij.openapi.ui.DialogWrapper;
@@ -17,7 +21,8 @@ public class TypeMappingDialog extends DialogWrapper {
     private final JPanel mappingPanel;
 
     public TypeMappingDialog(Map<String, String> relevantMappings) {
-        super(false); // 非模态对话框
+        // 非模态对话框
+        super(false);
         setTitle("数据库类型映射配置");
         setResizable(true);
 

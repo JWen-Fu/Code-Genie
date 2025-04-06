@@ -1,0 +1,45 @@
+{
+  "layers": {
+    "domain": {
+      "components": {
+        "Entity": {
+          "basePackage": "domain.model",
+          "templateFile": "EntityTemplate.ftl"
+        },
+        "Repository": {
+          "basePackage": "domain.repository",
+          "templateFile": "RepositoryTemplate.ftl"
+        }
+      }
+    },
+    "application": {
+      "components": {
+        "Service": {
+          "basePackage": "application.service",
+          "templateFile": "ServiceTemplate.ftl"
+        },
+        "DTO": {
+          "basePackage": "application.dto",
+          "templateFile": "DtoTemplate.ftl"
+        }
+      }
+    },
+    "infrastructure": {
+      "components": {
+        "RepositoryImpl": {
+          "basePackage": "infrastructure.persistence",
+          "templateFile": "RepositoryImplTemplate.ftl"
+        }
+      }
+    },
+    "interfaces": {
+      "components": {
+        "Controller": {
+          "basePackage": "interfaces.rest",
+          "templateFile": "ControllerTemplate.ftl"
+        }
+      }
+    }
+  },
+  "enableCQRS": false
+}

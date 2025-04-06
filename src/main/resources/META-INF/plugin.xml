@@ -6,6 +6,10 @@
 
     <description>
         Code-Genie 是一款基于 DDL 自动生成代码的 IntelliJ IDEA 插件，支持 MVC 和 DDD 架构模式。
+        ✅ 开箱即用的默认配置
+        ✅ 全自动目录创建
+        ✅ 安全的文件操作
+        ✅ 灵活的自定义能力
     </description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -13,7 +17,7 @@
     <actions>
         <action id="GenerateCodeAction"
                 class="com.zerodyn.plugin.GenerateCodeAction"
-                text="Generate-Code"
+                text="Generate Code"
                 description="根据输入的 DDL 语句生成 Entity、Controller、Service 等代码">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
