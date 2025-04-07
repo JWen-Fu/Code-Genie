@@ -11,8 +11,9 @@ package ${config.layers['domain'].components['Entity'].basePackage};
     @NoArgsConstructor
     @AllArgsConstructor
 </#if>
-public class ${classDefinitionName} {
+public class ${table.name}Entity {
 <#list table.columns as column>
+    /** ${column.comment} */
     private ${typeMapper.getJavaType(column.type)} ${column.name};
 </#list>
 }

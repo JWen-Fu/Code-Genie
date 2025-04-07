@@ -14,6 +14,7 @@ import com.zerodyn.plugin.service.DDDConfigManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -99,21 +100,15 @@ public class GenerateCodeAction extends AnAction {
 
     private DDDConfiguration configureDDD() throws IOException {
         DDDConfigManager configManager = new DDDConfigManager();
-
-        // 加载并验证配置
         DDDConfiguration dddConfig = configManager.loadConfiguration();
 
-        // 显示配置对话框
         DDDConfigDialog configDialog = new DDDConfigDialog(dddConfig);
         if (!configDialog.showAndGet()) {
             return null;
         }
 
-        // 保存前再次验证
-        DDDConfiguration finalConfig = configDialog.getConfiguration();
-        configManager.saveConfiguration(finalConfig);
-
-        return finalConfig;
+        configManager.saveConfiguration(configDialog.getConfiguration());
+        return configDialog.getConfiguration();
     }
 
     private void generateCode(Project project,
@@ -147,19 +142,17 @@ public class GenerateCodeAction extends AnAction {
     }
 
     private void showSuccess(String tableName) {
-        try {
-            String className = new CodeGenerator("", null, false, null).toClassName(tableName);
-            StringBuilder message = new StringBuilder("成功生成以下文件:\n");
+        String name = Arrays.stream(tableName.split("_"))
+                .filter(part -> !part.isEmpty())
+                .map(part -> part.substring(0, 1).toUpperCase() + part.substring(1).toLowerCase())
+                .collect(Collectors.joining());
 
-            // 动态获取实际生成的文件
-            String[] components = {"Entity", "Repository", "Service", "DTO", "Controller"};
-            for (String comp : components) {
-                message.append("- ").append(className).append(comp).append(".java\n");
-            }
-
-            Messages.showInfoMessage(message.toString(), "代码生成成功");
-        } catch (Exception e) {
-            Messages.showErrorDialog("生成成功但无法显示完整结果: " + e.getMessage(), "警告");
-        }
+        Messages.showInfoMessage(
+                "成功生成:\n" +
+                        "- " + name + "Entity.java\n" +
+                        "- " + name + "Repository.java\n" +
+                        "- " + name + "Service.java",
+                "完成"
+        );
     }
 }

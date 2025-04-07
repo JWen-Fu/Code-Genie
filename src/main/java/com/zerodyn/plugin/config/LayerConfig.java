@@ -25,7 +25,7 @@ public class LayerConfig {
         return Collections.unmodifiableMap(new HashMap<>(components));
     }
 
-    public boolean hasComponent(String componentType) {
-        return components.containsKey(componentType);
+    public boolean hasComponents() {
+        return !components.isEmpty();
     }
 }
