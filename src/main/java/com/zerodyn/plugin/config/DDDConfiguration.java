@@ -9,7 +9,7 @@ import java.util.Objects;
  * @since 2025/4/5
  */
 public class DDDConfiguration {
-    private Map<String, LayerConfig> layers = new LinkedHashMap<>();
+    private final Map<String, LayerConfig> layers;
     private boolean enableCQRS = false;
 
     public DDDConfiguration() {
@@ -18,32 +18,27 @@ public class DDDConfiguration {
     }
 
     private void initializeDefaultLayers() {
-        this.layers.put("domain", createDomainLayer());
-        this.layers.put("application", createApplicationLayer());
-        this.layers.put("infrastructure", createInfrastructureLayer());
-        this.layers.put("interfaces", createInterfacesLayer());
-    }
-
-    private LayerConfig createDomainLayer() {
-        return new LayerConfig()
+        this.layers.put("domain", new LayerConfig()
                 .addComponent("Entity", "domain.model", "EntityTemplate.ftl")
-                .addComponent("Repository", "domain.repository", "RepositoryTemplate.ftl");
-    }
+                .addComponent("Repository", "domain.repository", "RepositoryTemplate.ftl"));
 
-    private LayerConfig createApplicationLayer() {
-        return new LayerConfig()
+        this.layers.put("application", new LayerConfig()
                 .addComponent("Service", "application.service", "ServiceTemplate.ftl")
-                .addComponent("DTO", "application.dto", "DtoTemplate.ftl");
+                .addComponent("DTO", "application.dto", "DtoTemplate.ftl"));
+
+        this.layers.put("infrastructure", new LayerConfig()
+                .addComponent("RepositoryImpl", "infrastructure.persistence", "RepositoryImplTemplate.ftl"));
+
+        this.layers.put("interfaces", new LayerConfig()
+                .addComponent("Controller", "interfaces.rest", "ControllerTemplate.ftl"));
     }
 
-    private LayerConfig createInfrastructureLayer() {
-        return new LayerConfig()
-                .addComponent("RepositoryImpl", "infrastructure.persistence", "RepositoryImplTemplate.ftl");
-    }
-
-    private LayerConfig createInterfacesLayer() {
-        return new LayerConfig()
-                .addComponent("Controller", "interfaces.rest", "ControllerTemplate.ftl");
+    public Map<String, Map<String, ComponentConfig>> getAllComponents() {
+        Map<String, Map<String, ComponentConfig>> result = new LinkedHashMap<>();
+        layers.forEach((layerName, layerConfig) -> {
+            result.put(layerName, new LinkedHashMap<>(layerConfig.getComponents()));
+        });
+        return result;
     }
 
     public LayerConfig getLayer(String layerName) {
@@ -51,23 +46,8 @@ public class DDDConfiguration {
         return layers.computeIfAbsent(layerName, k -> new LayerConfig());
     }
 
-    public Map<String, ComponentConfig> getComponents(String layerName) {
-        LayerConfig layer = getLayer(layerName);
-        return layer != null ? layer.getComponents() : Map.of();
-    }
-
     public Map<String, LayerConfig> getLayers() {
-        return layers;
-    }
-
-    public Map<String, Map<String, ComponentConfig>> getAllValidComponents() {
-        Map<String, Map<String, ComponentConfig>> result = new LinkedHashMap<>();
-        layers.forEach((layerName, layerConfig) -> {
-            if (!layerConfig.getComponents().isEmpty()) {
-                result.put(layerName, layerConfig.getComponents());
-            }
-        });
-        return result;
+        return new LinkedHashMap<>(layers);
     }
 
     public boolean isEnableCQRS() {

@@ -8,6 +8,7 @@ import com.zerodyn.plugin.config.LayerConfig;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.File;
 import java.util.Map;
@@ -37,8 +38,11 @@ public class DDDConfigDialog extends DialogWrapper {
         // 基础设施层配置
         tabbedPane.addTab("基础设施层", createLayerPanel("infrastructure"));
 
-        // 新增接口层配置
-        tabbedPane.addTab("接口层", createLayerPanel("interfaces"));
+        // 接口层配置
+        JPanel interfacesPanel = createLayerPanel("interfaces");
+        // 添加Controller特殊配置
+        addControllerSpecificConfig(interfacesPanel, "interfaces");
+        tabbedPane.addTab("接口层", interfacesPanel);
 
         // 高级配置
         JPanel advancedPanel = new JPanel(new BorderLayout());
@@ -54,51 +58,88 @@ public class DDDConfigDialog extends DialogWrapper {
     }
 
     private JPanel createLayerPanel(String layerKey) {
-        LayerConfig layer = config.getLayers().get(layerKey);
-        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
+        LayerConfig layer = config.getLayer(layerKey);
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         for (Map.Entry<String, ComponentConfig> entry : layer.getComponents().entrySet()) {
-            if ("ValueObject".equals(entry.getKey())) {
-                continue;
-            }
             String componentType = entry.getKey();
             ComponentConfig compConfig = entry.getValue();
 
-            // 组件类型标签
-            panel.add(new JLabel(componentType + "包路径:"));
+            // 组件配置面板
+            JPanel compPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+            compPanel.setBorder(BorderFactory.createTitledBorder(componentType + "配置"));
 
-            // 包路径输入框
+            // 包路径配置
+            compPanel.add(new JLabel("包路径:"));
             JTextField packageField = new JTextField(compConfig.getBasePackage(), 20);
-            packageField.getDocument().addDocumentListener(new DocumentListener() {
-                public void changedUpdate(DocumentEvent e) { updateConfig(); }
-                public void insertUpdate(DocumentEvent e) { updateConfig(); }
-                public void removeUpdate(DocumentEvent e) { updateConfig(); }
+            packageField.getDocument().addDocumentListener(new SimpleDocumentListener(() -> {
+                compConfig.setBasePackage(packageField.getText().trim());
+            }));
+            compPanel.add(packageField);
 
-                private void updateConfig() {
-                    compConfig.setBasePackage(packageField.getText().trim());
-                }
-            });
-            panel.add(packageField);
-
-            // 模板选择器
-            panel.add(new JLabel(componentType + "模板:"));
+            // 模板文件配置
+            compPanel.add(new JLabel("模板文件:"));
+            JPanel templatePanel = new JPanel(new BorderLayout(5, 0));
             JTextField templateField = new JTextField(compConfig.getTemplateFile(), 15);
             JButton browseButton = new JButton("浏览...");
-            browseButton.addActionListener(e -> {
-                JFileChooser chooser = new JFileChooser();
-                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                    File file = chooser.getSelectedFile();
-                    templateField.setText(file.getName());
-                    compConfig.setTemplateFile(file.getName());
-                }
-            });
-            JPanel templatePanel = new JPanel(new BorderLayout(5, 0));
+            browseButton.addActionListener(e -> browseTemplateFile(templateField, compConfig));
             templatePanel.add(templateField, BorderLayout.CENTER);
             templatePanel.add(browseButton, BorderLayout.EAST);
-            panel.add(templatePanel);
+            compPanel.add(templatePanel);
+
+            panel.add(compPanel);
         }
+
         return panel;
+    }
+
+    private void addControllerSpecificConfig(JPanel panel, String layerKey) {
+        LayerConfig layer = config.getLayer(layerKey);
+        if (!layer.hasComponent("Controller")) {
+            layer.addComponent("Controller", "interfaces.rest", "ControllerTemplate.ftl");
+        }
+
+        ComponentConfig controllerConfig = layer.getComponents().get("Controller");
+
+        // API前缀配置
+        JPanel apiPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+        apiPanel.setBorder(BorderFactory.createTitledBorder("Controller特殊配置"));
+
+        apiPanel.add(new JLabel("API前缀:"));
+        JTextField apiPrefixField = new JTextField(
+                controllerConfig.getAdditionalConfig().getOrDefault("apiPrefix", "/api"),
+                20
+        );
+        apiPrefixField.getDocument().addDocumentListener(new SimpleDocumentListener(() -> {
+            controllerConfig.addConfigItem("apiPrefix", apiPrefixField.getText().trim());
+        }));
+        apiPanel.add(apiPrefixField);
+
+        panel.add(apiPanel);
+    }
+
+    private void browseTemplateFile(JTextField templateField, ComponentConfig config) {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(new FileNameExtensionFilter("FreeMarker模板文件", "ftl"));
+        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            templateField.setText(file.getName());
+            config.setTemplateFile(file.getName());
+        }
+    }
+
+    private static class SimpleDocumentListener implements DocumentListener {
+        private final Runnable callback;
+
+        SimpleDocumentListener(Runnable callback) {
+            this.callback = callback;
+        }
+
+        @Override public void insertUpdate(DocumentEvent e) { callback.run(); }
+        @Override public void removeUpdate(DocumentEvent e) { callback.run(); }
+        @Override public void changedUpdate(DocumentEvent e) { callback.run(); }
     }
 
     public DDDConfiguration getConfiguration() {

@@ -11,7 +11,7 @@ package ${config.layers['application'].components['DTO'].basePackage};
     @NoArgsConstructor
     @AllArgsConstructor
 </#if>
-public class ${table.name}DTO {
+public class ${className}DTO {
 <#list table.columns as column>
     private ${typeMapper.getJavaType(column.type)} ${column.name};
 </#list>

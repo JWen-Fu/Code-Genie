@@ -1,5 +1,7 @@
 package com.zerodyn.plugin.config;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -9,31 +11,40 @@ import java.util.Objects;
 public class ComponentConfig {
     private String basePackage;
     private String templateFile;
+    private final Map<String, String> additionalConfig;
 
     public ComponentConfig(String basePackage, String templateFile) {
-        this.basePackage = Objects.requireNonNull(basePackage, "Base package cannot be null");
-        this.templateFile = Objects.requireNonNull(templateFile, "Template file cannot be null");
+        this(basePackage, templateFile, new HashMap<>());
     }
 
-    // 新增验证方法
-    public void validate() {
-        if (basePackage.isBlank()) {
-            throw new IllegalStateException("Base package cannot be blank");
-        }
-        if (templateFile.isBlank()) {
-            throw new IllegalStateException("Template file cannot be blank");
-        }
+    public ComponentConfig(String basePackage, String templateFile, Map<String, String> additionalConfig) {
+        this.basePackage = Objects.requireNonNull(basePackage);
+        this.templateFile = Objects.requireNonNull(templateFile);
+        this.additionalConfig = new HashMap<>(Objects.requireNonNull(additionalConfig));
     }
 
-    // Getters
-    public String getBasePackage() { return basePackage; }
-    public String getTemplateFile() { return templateFile; }
+    // Getters and setters
+    public String getBasePackage() {
+        return basePackage;
+    }
 
     public void setBasePackage(String basePackage) {
-        this.basePackage = basePackage;
+        this.basePackage = Objects.requireNonNull(basePackage);
+    }
+
+    public String getTemplateFile() {
+        return templateFile;
     }
 
     public void setTemplateFile(String templateFile) {
-        this.templateFile = templateFile;
+        this.templateFile = Objects.requireNonNull(templateFile);
+    }
+
+    public Map<String, String> getAdditionalConfig() {
+        return new HashMap<>(additionalConfig);
+    }
+
+    public void addConfigItem(String key, String value) {
+        additionalConfig.put(Objects.requireNonNull(key), Objects.requireNonNull(value));
     }
 }

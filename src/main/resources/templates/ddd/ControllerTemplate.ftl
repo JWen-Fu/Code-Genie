@@ -1,26 +1,27 @@
 package ${config.layers['interfaces'].components['Controller'].basePackage};
 
-import ${config.layers['application'].components['Service'].basePackage}.${table.name}Service;
-import ${config.layers['application'].components['DTO'].basePackage}.${table.name}DTO;
+<#assign apiPrefix = config.layers['interfaces'].components['Controller'].additionalConfig.apiPrefix!"/api">
+
+import ${config.layers['application'].components['Service'].basePackage}.${className}Service;
+import ${config.layers['application'].components['DTO'].basePackage}.${className}DTO;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/${table.name?lower_case}")
-public class ${table.name}Controller {
-private final ${table.name}Service service;
+@RequestMapping("${apiPrefix}/${originalTableName?lower_case}")
+public class ${className}Controller {
+private final ${className}Service service;
 
-public ${table.name}Controller(${table.name}Service service) {
+public ${className}Controller(${className}Service service) {
 this.service = service;
 }
 
 @GetMapping("/{id}")
-public ${table.name}DTO getById(@PathVariable String id) {
-// TODO: 实现获取逻辑
-return null;
+public ${className}DTO getById(@PathVariable String id) {
+return service.getById(id);
 }
 
 @PostMapping
-public void create(@RequestBody ${table.name}DTO dto) {
-// TODO: 实现创建逻辑
+public void create(@RequestBody ${className}DTO dto) {
+service.save(dto);
 }
 }

@@ -48,18 +48,29 @@ public class DDDConfigManager {
     private void createCompleteDefaultConfig(Path targetPath) throws IOException {
         Files.createDirectories(targetPath.getParent());
 
-        // 使用DDDConfiguration的默认构造生成完整配置
+        // 使用安全的默认配置
         DDDConfiguration defaultConfig = new DDDConfiguration();
+
+        // 再次确认清理ValueObject
+        defaultConfig.getLayers().values().forEach(layer -> {
+            layer.getComponents().remove("ValueObject");
+        });
+
         saveConfiguration(defaultConfig);
     }
 
     private void validateAndCompleteConfig(DDDConfiguration config) {
         // 确保所有必要层都存在
-        for (String layer : REQUIRED_LAYERS) {
-            if (!config.getLayers().containsKey(layer)) {
-                config.getLayers().put(layer, new LayerConfig());
-            }
+        String[] requiredLayers = {"domain", "application", "infrastructure", "interfaces"};
+        for (String layer : requiredLayers) {
+            // 会自动创建不存在的层
+            config.getLayer(layer);
         }
+
+        // 强制清理ValueObject配置
+        config.getLayers().values().forEach(layer -> {
+            layer.getComponents().remove("ValueObject");
+        });
     }
 
     public void saveConfiguration(DDDConfiguration config) throws IOException {
@@ -109,7 +120,7 @@ public class DDDConfigManager {
             } else {
                 // 创建基本模板
                 String content = templateName.equals("RepositoryTemplate.ftl") ?
-                        "<#-- 默认Repository实现模板 -->\npackage ${config.layers['infrastructure'].components['RepositoryImpl'].basePackage};\n\npublic class Jpa${table.name}RepositoryImpl {}" :
+                        "<#-- 默认Repository实现模板 -->\npackage ${config.layers['infrastructure'].components['RepositoryImpl'].basePackage};\n\npublic class ${table.name}RepositoryImpl {}" :
                         "";
                 Files.writeString(templateDir.resolve(templateName), content);
             }
