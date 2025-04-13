@@ -19,22 +19,15 @@ public class ComponentConfig {
         this.templateFile = Objects.requireNonNull(templateFile, "Template file cannot be null");
     }
 
-    public void validate() {
-        if (basePackage.isBlank()) {
-            throw new IllegalStateException("Base package cannot be blank");
-        }
-        if (templateFile.isBlank()) {
-            throw new IllegalStateException("Template file cannot be blank");
-        }
-    }
-
     public String getBasePackage() {
         // 确保包路径以com.开头
         return basePackage.startsWith("com.") || basePackage.startsWith("org.") ?
                 basePackage : "com." + basePackage;
     }
 
-    public String getTemplateFile() { return templateFile; }
+    public String getTemplateFile() {
+        return templateFile;
+    }
 
     public void setBasePackage(String basePackage) {
         this.basePackage = basePackage;

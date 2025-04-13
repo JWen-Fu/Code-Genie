@@ -66,8 +66,8 @@ public class GenerateCodeAction extends AnAction {
 
     private FieldTypeMapper handleTypeMappings(Project project, DDLParser.Table table) {
         try {
-            Set<String> requiredTypes = table.getColumns().stream()
-                    .map(col -> normalizeType(col.getType()))
+            Set<String> requiredTypes = table.columns().stream()
+                    .map(col -> normalizeType(col.type()))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
@@ -125,8 +125,8 @@ public class GenerateCodeAction extends AnAction {
 
     private DDLParser.Table parseDDL(Project project, String ddl) {
         DDLParser.Table table = new DDLParser().parseDDL(ddl);
-        if (table == null || table.getColumns() == null || table.getColumns().isEmpty()) {
-            showError(project, "DDL解析失败或无字段定义");  // 添加project参数
+        if (table == null || table.columns() == null || table.columns().isEmpty()) {
+            showError(project, "DDL解析失败或无字段定义");
             return null;
         }
         return table;

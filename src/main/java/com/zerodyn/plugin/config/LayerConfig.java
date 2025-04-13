@@ -4,7 +4,6 @@
 
 package com.zerodyn.plugin.config;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,11 +25,7 @@ public class LayerConfig {
 
     public Map<String, ComponentConfig> getComponents() {
         // 返回不可修改的副本
-        return Collections.unmodifiableMap(new HashMap<>(components));
-    }
-
-    public boolean hasComponents() {
-        return !components.isEmpty();
+        return Map.copyOf(components);
     }
 
     public String getModuleName() {

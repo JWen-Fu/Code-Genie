@@ -108,63 +108,9 @@ public class DDLParser {
         return builder.toString();
     }
 
-    public static class Table {
-        private final String name;
-        private final List<Column> columns;
-        private final String comment;
-
-        public Table(String name, List<Column> columns, String comment) {
-            this.name = name;
-            this.columns = columns;
-            this.comment = comment;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public List<Column> getColumns() {
-            return columns;
-        }
-
-        public String getComment() {
-            return comment;
-        }
+    public record Table(String name, List<Column> columns, String comment) {
     }
 
-    public static class Column {
-        private final String originalName;
-        private final String name;
-        private final String type;
-        private final boolean notNull;
-        private final String comment;
-
-        public Column(String originalName, String name, String type, boolean notNull, String comment) {
-            this.originalName = originalName;
-            this.name = name;
-            this.type = type;
-            this.notNull = notNull;
-            this.comment = comment;
-        }
-
-        public String getOriginalName() {
-            return originalName;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getType() {
-            return type;
-        }
-
-        public boolean isNotNull() {
-            return notNull;
-        }
-
-        public String getComment() {
-            return comment;
-        }
+    public record Column(String originalName, String name, String type, boolean notNull, String comment) {
     }
 }

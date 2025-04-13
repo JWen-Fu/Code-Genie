@@ -64,18 +64,6 @@ public class FieldTypeMapper {
         }
     }
 
-    public String getJavaType(String sqlType) {
-        Matcher matcher = TYPE_PATTERN.matcher(sqlType.trim());
-        if (matcher.find()) {
-            String baseType = matcher.group(1).toLowerCase();
-            if ("tinyint".equals(baseType) && sqlType.toLowerCase().contains("tinyint(1)")) {
-                return "Boolean";
-            }
-            return mappings.getOrDefault(baseType, "Object");
-        }
-        return "Object";
-    }
-
     public Map<String, String> getRelevantMappings(Set<String> requiredTypes) {
         Map<String, String> result = new LinkedHashMap<>();
         requiredTypes.forEach(type -> {

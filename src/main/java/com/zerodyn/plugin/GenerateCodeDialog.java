@@ -56,8 +56,4 @@ public class GenerateCodeDialog extends DialogWrapper {
     public String getDDL() {
         return ddlTextArea.getText();
     }
-
-    public String getSelectedArchitecture() {
-        return (String) architectureComboBox.getSelectedItem();
-    }
 }
