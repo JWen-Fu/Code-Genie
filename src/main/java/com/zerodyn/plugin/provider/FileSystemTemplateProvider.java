@@ -1,6 +1,8 @@
-package com.zerodyn.plugin.provider;
+/*
+ * Copyright (c) by Zerodyn Technologies 2025-2025. All rights reserved.
+ */
 
-import freemarker.template.TemplateException;
+package com.zerodyn.plugin.provider;
 
 import java.io.IOException;
 import java.nio.file.Files;

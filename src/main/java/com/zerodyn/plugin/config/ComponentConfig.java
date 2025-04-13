@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) by Zerodyn Technologies 2025-2025. All rights reserved.
+ */
+
 package com.zerodyn.plugin.config;
 
 import java.util.Objects;

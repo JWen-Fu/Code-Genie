@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) by Zerodyn Technologies 2025-2025. All rights reserved.
+ */
+
 package com.zerodyn.plugin.template;
 
 import com.zerodyn.plugin.provider.CompositeTemplateProvider;
@@ -5,7 +9,6 @@ import com.zerodyn.plugin.provider.DefaultTemplateProvider;
 import com.zerodyn.plugin.provider.FileSystemTemplateProvider;
 import com.zerodyn.plugin.provider.ResourceTemplateProvider;
 import com.zerodyn.plugin.provider.TemplateProvider;
-import freemarker.template.TemplateException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,7 +27,7 @@ public class TemplateInitializer {
     private static final String RESOURCE_TEMPLATE_DIR = "/templates/ddd/";
 
     public static TemplateManager createDefaultTemplateManager() {
-        // 1. 创建提供器链
+        // 1. 创建提供器链（顺序决定了优先级）
         List<TemplateProvider> providers = new ArrayList<>();
 
         // 用户自定义模板优先
@@ -33,14 +36,16 @@ public class TemplateInitializer {
         // 然后是内置资源模板
         providers.add(new ResourceTemplateProvider(RESOURCE_TEMPLATE_DIR));
 
-        // 最后是默认模板
-        TemplateProvider fallbackProvider = new DefaultTemplateProvider();
+        // 2. 创建复合提供器（使用DefaultTemplateProvider作为最终回退）
+        CompositeTemplateProvider compositeProvider = new CompositeTemplateProvider(
+                providers,
+                new DefaultTemplateProvider()
+        );
 
-        // 2. 创建复合提供器
-        CompositeTemplateProvider compositeProvider =
-                new CompositeTemplateProvider(providers, fallbackProvider);
+        // 3. 确保默认模板存在
+        ensureDefaultTemplates();
 
-        // 3. 初始化模板管理器
+        // 4. 初始化模板管理器
         return new TemplateManager(compositeProvider);
     }
 
@@ -52,27 +57,26 @@ public class TemplateInitializer {
             }
             return dir;
         } catch (IOException e) {
-            throw new RuntimeException("Failed to create template directory");
+            throw new RuntimeException("Failed to create template directory", e);
         }
     }
 
-    public static void ensureDefaultTemplates() throws TemplateException {
+    public static void ensureDefaultTemplates() {
         Path userDir = getUserTemplateDir();
-        ResourceTemplateProvider resourceProvider =
-                new ResourceTemplateProvider(RESOURCE_TEMPLATE_DIR);
+        ResourceTemplateProvider resourceProvider = new ResourceTemplateProvider(RESOURCE_TEMPLATE_DIR);
+        DefaultTemplateProvider defaultProvider = new DefaultTemplateProvider();
 
-        // 确保所有必需模板都存在
         for (String template : getRequiredTemplates()) {
             Path templatePath = userDir.resolve(template);
             if (!Files.exists(templatePath)) {
                 try {
                     // 尝试从资源复制
-                    if (resourceProvider.templateExists(template)) {
-                        String content = resourceProvider.getTemplateContent(template);
-                        Files.writeString(templatePath, content);
-                    }
+                    String content = resourceProvider.templateExists(template)
+                            ? resourceProvider.getTemplateContent(template)
+                            : defaultProvider.getTemplateContent(template);
+                    Files.writeString(templatePath, content);
                 } catch (IOException e) {
-                    // 忽略错误，后续会使用默认模板
+                    // 忽略错误，CompositeTemplateProvider会处理回退
                 }
             }
         }

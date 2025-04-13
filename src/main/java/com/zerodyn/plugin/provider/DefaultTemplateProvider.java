@@ -1,7 +1,5 @@
 package com.zerodyn.plugin.provider;
 
-import freemarker.template.TemplateException;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,14 +12,30 @@ public class DefaultTemplateProvider implements TemplateProvider {
 
     public DefaultTemplateProvider() {
         this.defaultTemplates = new HashMap<>();
-        // 可以配置化加载默认模板
-        defaultTemplates.put("RepositoryTemplate.ftl",
-                "package ${config.layers['domain'].components['Repository'].basePackage};\n\n" +
-                        "public interface ${table.name}Repository {\n" +
-                        "    ${table.name}Entity findById(String id);\n" +
-                        "    void save(${table.name}Entity entity);\n" +
+        initDefaultTemplates();
+    }
+
+    private void initDefaultTemplates() {
+        // 实体模板
+        defaultTemplates.put("EntityTemplate.ftl",
+                "<#if useLombok>\n" +
+                        "import lombok.Data;\n" +
+                        "import lombok.NoArgsConstructor;\n" +
+                        "import lombok.AllArgsConstructor;\n" +
+                        "</#if>\n\n" +
+                        "<#if useLombok>\n" +
+                        "@Data\n" +
+                        "@NoArgsConstructor\n" +
+                        "@AllArgsConstructor\n" +
+                        "</#if>\n" +
+                        "public class ${className}${componentType} {\n" +
+                        "<#list table.columns as column>\n" +
+                        "    private ${typeMapper.getJavaType(column.type)} ${column.name};\n" +
+                        "</#list>\n" +
                         "}");
-        // 其他默认模板...
+
+        // 其他模板...
+        // 确保包含所有getRequiredTemplates()中列出的模板
     }
 
     @Override
