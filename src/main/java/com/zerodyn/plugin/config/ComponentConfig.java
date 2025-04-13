@@ -15,7 +15,6 @@ public class ComponentConfig {
         this.templateFile = Objects.requireNonNull(templateFile, "Template file cannot be null");
     }
 
-    // 新增验证方法
     public void validate() {
         if (basePackage.isBlank()) {
             throw new IllegalStateException("Base package cannot be blank");
@@ -25,8 +24,12 @@ public class ComponentConfig {
         }
     }
 
-    // Getters
-    public String getBasePackage() { return basePackage; }
+    public String getBasePackage() {
+        // 确保包路径以com.开头
+        return basePackage.startsWith("com.") || basePackage.startsWith("org.") ?
+                basePackage : "com." + basePackage;
+    }
+
     public String getTemplateFile() { return templateFile; }
 
     public void setBasePackage(String basePackage) {

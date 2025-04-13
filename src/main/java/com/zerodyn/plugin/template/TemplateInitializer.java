@@ -23,7 +23,7 @@ public class TemplateInitializer {
     private static final String USER_TEMPLATE_DIR = ".codegen/templates/ddd";
     private static final String RESOURCE_TEMPLATE_DIR = "/templates/ddd/";
 
-    public static TemplateManager createDefaultTemplateManager() throws TemplateException {
+    public static TemplateManager createDefaultTemplateManager() {
         // 1. 创建提供器链
         List<TemplateProvider> providers = new ArrayList<>();
 

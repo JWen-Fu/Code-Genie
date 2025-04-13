@@ -1,16 +1,21 @@
 package com.zerodyn.plugin.service;
 
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.zerodyn.plugin.config.ComponentConfig;
 import com.zerodyn.plugin.config.DDDConfiguration;
-import com.zerodyn.plugin.config.LayerConfig;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author JWen
@@ -18,95 +23,171 @@ import java.util.Map;
  */
 public class DDDConfigDialog extends DialogWrapper {
     private final DDDConfiguration config;
+    private final Project project;
     private final JTabbedPane tabbedPane = new JTabbedPane();
+    private final Map<String, Map<String, JTextField>> componentFields = new HashMap<>();
 
-    public DDDConfigDialog(DDDConfiguration initialConfig) {
-        super(true);
-        this.config = initialConfig;
-        initUI();
+    public DDDConfigDialog(Project project, DDDConfiguration initialConfig) {
+        super(project, true);
+        this.project = Objects.requireNonNull(project);
+        this.config = Objects.requireNonNull(initialConfig);
+        setTitle("DDD架构配置");
         init();
     }
 
-    private void initUI() {
-        // 领域层配置
-        tabbedPane.addTab("领域层", createLayerPanel("domain"));
-
-        // 应用层配置
-        tabbedPane.addTab("应用层", createLayerPanel("application"));
-
-        // 基础设施层配置
-        tabbedPane.addTab("基础设施层", createLayerPanel("infrastructure"));
-
-        // 新增接口层配置
-        tabbedPane.addTab("接口层", createLayerPanel("interfaces"));
-
-        // 高级配置
-        JPanel advancedPanel = new JPanel(new BorderLayout());
-        JCheckBox cqrsCheckBox = new JCheckBox("启用CQRS模式", config.isEnableCQRS());
-        cqrsCheckBox.addChangeListener(e ->
-                config.setEnableCQRS(cqrsCheckBox.isSelected()));
-        advancedPanel.add(cqrsCheckBox, BorderLayout.NORTH);
-        tabbedPane.addTab("高级", advancedPanel);
-
-        setTitle("DDD架构配置");
-        getContentPane().add(tabbedPane);
-        setSize(600, 400);
+    @Override
+    protected void init() {
+        super.init();
+        initUI();
     }
 
-    private JPanel createLayerPanel(String layerKey) {
-        LayerConfig layer = config.getLayers().get(layerKey);
-        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-        for (Map.Entry<String, ComponentConfig> entry : layer.getComponents().entrySet()) {
-            if ("ValueObject".equals(entry.getKey())) {
-                continue;
-            }
-            String componentType = entry.getKey();
-            ComponentConfig compConfig = entry.getValue();
-
-            // 组件类型标签
-            panel.add(new JLabel(componentType + "包路径:"));
-
-            // 包路径输入框
-            JTextField packageField = new JTextField(compConfig.getBasePackage(), 20);
-            packageField.getDocument().addDocumentListener(new DocumentListener() {
-                public void changedUpdate(DocumentEvent e) { updateConfig(); }
-                public void insertUpdate(DocumentEvent e) { updateConfig(); }
-                public void removeUpdate(DocumentEvent e) { updateConfig(); }
-
-                private void updateConfig() {
-                    compConfig.setBasePackage(packageField.getText().trim());
-                }
-            });
-            panel.add(packageField);
-
-            // 模板选择器
-            panel.add(new JLabel(componentType + "模板:"));
-            JTextField templateField = new JTextField(compConfig.getTemplateFile(), 15);
-            JButton browseButton = new JButton("浏览...");
-            browseButton.addActionListener(e -> {
-                JFileChooser chooser = new JFileChooser();
-                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                    File file = chooser.getSelectedFile();
-                    templateField.setText(file.getName());
-                    compConfig.setTemplateFile(file.getName());
-                }
-            });
-            JPanel templatePanel = new JPanel(new BorderLayout(5, 0));
-            templatePanel.add(templateField, BorderLayout.CENTER);
-            templatePanel.add(browseButton, BorderLayout.EAST);
-            panel.add(templatePanel);
+    private void initUI() {
+        List<String> modules = getProjectModules();
+        if (modules.isEmpty()) {
+            modules.add(""); // 保证至少有一个空选项
         }
-        return panel;
+
+        // 初始化各层配置
+        initLayerTab("domain", modules);
+        initLayerTab("application", modules);
+        initLayerTab("infrastructure", modules);
+        initLayerTab("interfaces", modules);
+
+        // 高级配置
+        initAdvancedTab();
+    }
+
+    private void initLayerTab(String layer, List<String> modules) {
+        JPanel panel = new JPanel(new BorderLayout());
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+
+        // 模块选择
+        JPanel modulePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        modulePanel.add(new JLabel("目标模块:"));
+        JComboBox<String> moduleCombo = new JComboBox<>(modules.toArray(new String[0]));
+        moduleCombo.setSelectedItem(config.getLayer(layer).getModuleName());
+        moduleCombo.addActionListener(e ->
+                config.getLayer(layer).setModuleName((String)moduleCombo.getSelectedItem())
+        );
+        modulePanel.add(moduleCombo);
+        contentPanel.add(modulePanel);
+
+        // 组件配置（过滤掉ValueObject）
+        Map<String, ComponentConfig> components = config.getLayer(layer).getComponents();
+        Map<String, JTextField> layerFields = new HashMap<>();
+        componentFields.put(layer, layerFields);
+
+        components.entrySet().stream()
+                .filter(entry -> !"ValueObject".equals(entry.getKey())) // 过滤条件
+                .forEach(entry -> {
+                    String compType = entry.getKey();
+                    ComponentConfig compConfig = entry.getValue();
+
+                    JPanel compPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+                    compPanel.setBorder(BorderFactory.createTitledBorder(compType));
+
+                    // 包路径配置
+                    compPanel.add(new JLabel("包路径:"));
+                    JTextField pkgField = new JTextField(compConfig.getBasePackage());
+                    pkgField.getDocument().addDocumentListener(new ConfigUpdater(compConfig, "basePackage", pkgField));
+                    compPanel.add(pkgField);
+                    layerFields.put(compType + ".pkg", pkgField);
+
+                    // 模板文件配置
+                    compPanel.add(new JLabel("模板文件:"));
+                    JPanel templatePanel = new JPanel(new BorderLayout(5, 0));
+                    JTextField templateField = new JTextField(compConfig.getTemplateFile());
+                    JButton browseBtn = new JButton("浏览...");
+                    browseBtn.addActionListener(e -> browseTemplateFile(templateField));
+                    templatePanel.add(templateField, BorderLayout.CENTER);
+                    templatePanel.add(browseBtn, BorderLayout.EAST);
+                    compPanel.add(templatePanel);
+                    layerFields.put(compType + ".template", templateField);
+                    templateField.getDocument().addDocumentListener(new ConfigUpdater(compConfig, "templateFile", templateField));
+
+                    contentPanel.add(compPanel);
+                });
+
+        panel.add(contentPanel, BorderLayout.NORTH);
+        tabbedPane.addTab(layer + "层", panel);
+    }
+
+    private void initAdvancedTab() {
+        JPanel panel = new JPanel(new BorderLayout());
+        JCheckBox cqrsCheckBox = new JCheckBox("启用CQRS模式", config.isEnableCQRS());
+        cqrsCheckBox.addChangeListener(e -> config.setEnableCQRS(cqrsCheckBox.isSelected()));
+        panel.add(cqrsCheckBox, BorderLayout.NORTH);
+        tabbedPane.addTab("高级", panel);
+    }
+
+    private void browseTemplateFile(JTextField targetField) {
+        JFileChooser chooser = new JFileChooser();
+        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            targetField.setText(chooser.getSelectedFile().getName());
+        }
+    }
+
+    private List<String> getProjectModules() {
+        try {
+            VirtualFile baseDir = project.getBaseDir();
+            if (baseDir != null) {
+                return Arrays.stream(baseDir.getChildren())
+                        .filter(VirtualFile::isDirectory)
+                        .filter(dir -> dir.findChild("src") != null)
+                        .map(VirtualFile::getName)
+                        .toList();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    protected JComponent createCenterPanel() {
+        return tabbedPane;
     }
 
     public DDDConfiguration getConfiguration() {
         return config;
     }
 
-    @Override
-    protected JComponent createCenterPanel() {
-        return tabbedPane;
+    private class ConfigUpdater implements DocumentListener {
+        private final ComponentConfig config;
+        private final String field;
+        private final JTextField textField;
+
+        public ConfigUpdater(ComponentConfig config, String field, JTextField textField) {
+            this.config = config;
+            this.field = field;
+            this.textField = textField;
+        }
+
+        @Override
+        public void insertUpdate(DocumentEvent e) {
+            update();
+        }
+
+        @Override
+        public void removeUpdate(DocumentEvent e) {
+            update();
+        }
+
+        @Override
+        public void changedUpdate(DocumentEvent e) {
+            update();
+        }
+
+        private void update() {
+            switch (field) {
+                case "basePackage":
+                    config.setBasePackage(textField.getText());
+                    break;
+                case "templateFile":
+                    config.setTemplateFile(textField.getText());
+                    break;
+            }
+        }
     }
 }

@@ -1,4 +1,3 @@
-package ${config.layers['application'].components['DTO'].basePackage};
 
 <#if useLombok>
     import lombok.Data;
@@ -11,7 +10,7 @@ package ${config.layers['application'].components['DTO'].basePackage};
     @NoArgsConstructor
     @AllArgsConstructor
 </#if>
-public class ${table.name}DTO {
+public class ${className}${componentType} {
 <#list table.columns as column>
     private ${typeMapper.getJavaType(column.type)} ${column.name};
 </#list>

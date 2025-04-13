@@ -1,15 +1,18 @@
 package com.zerodyn.plugin.config;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * @author JWen
  * @since 2025/4/5
  */
 public class DDDConfiguration {
-    private Map<String, LayerConfig> layers = new LinkedHashMap<>();
+    private final Map<String, LayerConfig> layers;
     private boolean enableCQRS = false;
 
     public DDDConfiguration() {
@@ -18,10 +21,40 @@ public class DDDConfiguration {
     }
 
     private void initializeDefaultLayers() {
-        this.layers.put("domain", createDomainLayer());
-        this.layers.put("application", createApplicationLayer());
-        this.layers.put("infrastructure", createInfrastructureLayer());
-        this.layers.put("interfaces", createInterfacesLayer());
+        // 只初始化我们需要的组件
+        layers.put("domain", createDomainLayer());
+        layers.put("application", createApplicationLayer());
+        layers.put("infrastructure", createInfrastructureLayer());
+        layers.put("interfaces", createInterfacesLayer());
+    }
+
+    private boolean isValidComponentType(String layer, String componentType) {
+        // 定义每个层允许的组件类型白名单
+        Map<String, Set<String>> validComponents = Map.of(
+                "domain", Set.of("Entity", "Repository"),
+                "application", Set.of("Service", "DTO"),
+                "infrastructure", Set.of("RepositoryImpl"),
+                "interfaces", Set.of("Controller")
+        );
+        return validComponents.getOrDefault(layer, Collections.emptySet())
+                .contains(componentType);
+    }
+
+    public Map<String, Map<String, ComponentConfig>> getAllValidComponents() {
+        Map<String, Map<String, ComponentConfig>> result = new LinkedHashMap<>();
+        layers.forEach((layerName, layerConfig) -> {
+            Map<String, ComponentConfig> validComponents = new HashMap<>();
+            layerConfig.getComponents().forEach((compType, config) -> {
+                // 严格过滤组件类型
+                if (isValidComponentType(layerName, compType)) {
+                    validComponents.put(compType, config);
+                }
+            });
+            if (!validComponents.isEmpty()) {
+                result.put(layerName, validComponents);
+            }
+        });
+        return result;
     }
 
     private LayerConfig createDomainLayer() {
@@ -51,23 +84,8 @@ public class DDDConfiguration {
         return layers.computeIfAbsent(layerName, k -> new LayerConfig());
     }
 
-    public Map<String, ComponentConfig> getComponents(String layerName) {
-        LayerConfig layer = getLayer(layerName);
-        return layer != null ? layer.getComponents() : Map.of();
-    }
-
     public Map<String, LayerConfig> getLayers() {
         return layers;
-    }
-
-    public Map<String, Map<String, ComponentConfig>> getAllValidComponents() {
-        Map<String, Map<String, ComponentConfig>> result = new LinkedHashMap<>();
-        layers.forEach((layerName, layerConfig) -> {
-            if (!layerConfig.getComponents().isEmpty()) {
-                result.put(layerName, layerConfig.getComponents());
-            }
-        });
-        return result;
     }
 
     public boolean isEnableCQRS() {

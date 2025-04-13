@@ -11,22 +11,26 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author JWen
  * @since 2025/3/26
  */
 public class TypeMappingDialog extends DialogWrapper {
-    private final JPanel mainPanel;
-    private final JPanel mappingPanel;
+    private JPanel mainPanel;
+    private JPanel mappingPanel;
+    private final Map<String, String> initialMappings;
 
     public TypeMappingDialog(Map<String, String> relevantMappings) {
-        // 非模态对话框
         super(false);
+        this.initialMappings = Objects.requireNonNull(relevantMappings);
         setTitle("数据库类型映射配置");
-        setResizable(true);
+        initUI();
+        init();
+    }
 
-        // 主面板设置
+    private void initUI() {
         mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -35,15 +39,11 @@ public class TypeMappingDialog extends DialogWrapper {
                 "<html><b>提示：</b> 配置数据库类型到Java类型的映射关系<br>" +
                         "示例：varchar → String, tinyint(1) → Boolean</html>"
         );
-        helpLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         mainPanel.add(helpLabel, BorderLayout.NORTH);
 
         // 映射面板
         mappingPanel = new JPanel();
         mappingPanel.setLayout(new BoxLayout(mappingPanel, BoxLayout.Y_AXIS));
-        mappingPanel.setBorder(BorderFactory.createEtchedBorder());
-
-        // 添加滚动条
         JScrollPane scrollPane = new JScrollPane(mappingPanel);
         scrollPane.setPreferredSize(new Dimension(500, 300));
         mainPanel.add(scrollPane, BorderLayout.CENTER);
@@ -55,9 +55,8 @@ public class TypeMappingDialog extends DialogWrapper {
         buttonPanel.add(addButton);
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
-        // 初始化UI后再加载数据
-        init();
-        loadMappings(relevantMappings);
+        // 加载初始映射
+        loadMappings(initialMappings);
     }
 
     private void loadMappings(Map<String, String> mappings) {

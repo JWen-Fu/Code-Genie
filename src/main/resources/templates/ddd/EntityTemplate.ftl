@@ -1,4 +1,3 @@
-package ${config.layers['domain'].components['Entity'].basePackage};
 
 <#if useLombok>
     import lombok.Data;
@@ -11,7 +10,7 @@ package ${config.layers['domain'].components['Entity'].basePackage};
     @NoArgsConstructor
     @AllArgsConstructor
 </#if>
-public class ${table.name}Entity {
+public class ${className}${componentType} {
 <#list table.columns as column>
     /** ${column.comment} */
     private ${typeMapper.getJavaType(column.type)} ${column.name};

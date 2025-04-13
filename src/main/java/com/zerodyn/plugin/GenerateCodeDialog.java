@@ -4,6 +4,7 @@
 
 package com.zerodyn.plugin;
 
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,8 +20,8 @@ public class GenerateCodeDialog extends DialogWrapper {
     private JTextArea ddlTextArea;
     private JComboBox<String> architectureComboBox;
 
-    public GenerateCodeDialog() {
-        super(true);
+    public GenerateCodeDialog(Project project) {
+        super(project, true);  // 传递project给父类
         setTitle("请输入 DDL 语句并选择架构模式");
         init();
     }

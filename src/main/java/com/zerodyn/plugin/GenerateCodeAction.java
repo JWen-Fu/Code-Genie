@@ -12,6 +12,7 @@ import com.zerodyn.plugin.config.DDDConfiguration;
 import com.zerodyn.plugin.service.DDDConfigDialog;
 import com.zerodyn.plugin.service.DDDConfigManager;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -35,95 +36,101 @@ public class GenerateCodeAction extends AnAction {
 
         try {
             // 1. 获取DDL输入
-            String ddl = getDDLFromUser();
+            String ddl = getDDLFromUser(project);
             if (ddl == null) return;
 
             // 2. 解析DDL
-            DDLParser.Table table = parseDDL(ddl);
+            DDLParser.Table table = parseDDL(project, ddl);
             if (table == null) return;
 
             // 3. 处理类型映射
-            FieldTypeMapper typeMapper = handleTypeMappings(table);
+            FieldTypeMapper typeMapper = handleTypeMappings(project, table);
             if (typeMapper == null) return;
 
             // 4. 配置DDD架构
-            DDDConfiguration dddConfig = configureDDD();
+            DDDConfiguration dddConfig = configureDDD(project);
             if (dddConfig == null) return;
 
             // 5. 生成代码
             generateCode(project, table, typeMapper, dddConfig);
 
         } catch (Exception ex) {
-            showError("生成过程中出错: " + ex.getMessage());
+            showError(project, "生成过程中出错: " +
+                    (ex.getMessage() != null ? ex.getMessage() : "未知错误"));
         }
     }
 
-    private String getDDLFromUser() {
-        GenerateCodeDialog ddlDialog = new GenerateCodeDialog();
-        if (!ddlDialog.showAndGet()) {
-            return null;
-        }
-        return ddlDialog.getDDL();
+    private String getDDLFromUser(Project project) {
+        GenerateCodeDialog ddlDialog = new GenerateCodeDialog(project);
+        return ddlDialog.showAndGet() ? ddlDialog.getDDL() : null;
     }
 
-    private DDLParser.Table parseDDL(String ddl) {
-        DDLParser.Table table = new DDLParser().parseDDL(ddl);
-        if (table == null || table.getColumns() == null || table.getColumns().isEmpty()) {
-            showError("DDL解析失败或无字段定义");
-            return null;
-        }
-        return table;
-    }
-
-    private FieldTypeMapper handleTypeMappings(DDLParser.Table table) {
-        Set<String> requiredTypes = table.getColumns().stream()
-                .map(col -> normalizeType(col.getType()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        FieldTypeMapper typeMapper = new FieldTypeMapper();
-        Map<String, String> relevantMappings = typeMapper.getRelevantMappings(requiredTypes);
-
-        TypeMappingDialog mappingDialog = new TypeMappingDialog(relevantMappings);
-        if (!mappingDialog.showAndGet()) {
-            return null;
-        }
-
+    private FieldTypeMapper handleTypeMappings(Project project, DDLParser.Table table) {
         try {
-            typeMapper.savePartialMappings(mappingDialog.getModifiedMappings());
-            return typeMapper;
-        } catch (IOException e) {
-            showError("类型映射保存失败: " + e.getMessage());
-            return null;
+            Set<String> requiredTypes = table.getColumns().stream()
+                    .map(col -> normalizeType(col.getType()))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            FieldTypeMapper typeMapper = new FieldTypeMapper();
+            Map<String, String> relevantMappings = typeMapper.getRelevantMappings(requiredTypes);
+
+            TypeMappingDialog mappingDialog = new TypeMappingDialog(relevantMappings);
+
+            if (mappingDialog.showAndGet()) {
+                typeMapper.savePartialMappings(mappingDialog.getModifiedMappings());
+                return typeMapper;
+            }
+        } catch (Exception e) {
+            showError(project, "类型映射配置失败: " + e.getMessage());
         }
+        return null;
     }
 
-    private DDDConfiguration configureDDD() throws IOException {
-        DDDConfigManager configManager = new DDDConfigManager();
-        DDDConfiguration dddConfig = configManager.loadConfiguration();
+    private DDDConfiguration configureDDD(Project project) {
+        try {
+            DDDConfigManager configManager = new DDDConfigManager();
+            DDDConfiguration config = configManager.loadConfiguration();
 
-        DDDConfigDialog configDialog = new DDDConfigDialog(dddConfig);
-        if (!configDialog.showAndGet()) {
-            return null;
+            // 确保配置对象有效
+            if (config == null) {
+                throw new IllegalStateException("配置初始化失败");
+            }
+
+            DDDConfigDialog configDialog = new DDDConfigDialog(project, config);
+            if (configDialog.showAndGet()) {
+                DDDConfiguration updatedConfig = configDialog.getConfiguration();
+                configManager.saveConfiguration(updatedConfig);
+                return updatedConfig;
+            }
+        } catch (Exception e) {
+            String errorMsg = "配置加载失败: " + (e.getMessage() != null ? e.getMessage() : "未知原因");
+            Messages.showErrorDialog(project, errorMsg, "配置错误");
+            // 记录完整错误日志
+            LoggerFactory.getLogger(getClass()).error("配置加载错误", e);
         }
-
-        configManager.saveConfiguration(configDialog.getConfiguration());
-        return configDialog.getConfiguration();
+        return null;
     }
 
     private void generateCode(Project project,
                               DDLParser.Table table,
                               FieldTypeMapper typeMapper,
                               DDDConfiguration dddConfig) throws IOException {
-        CodeGenerator generator = new CodeGenerator(
-                project.getBasePath() + "/src/main/java",
-                typeMapper,
-                true,
-                dddConfig
-        );
+        new CodeGenerator(project, typeMapper, true, dddConfig)
+                .generateDDDCode(table);
+    }
 
-        generator.generateAll(table);
-        showSuccess(table.getName());
+    private void showError(Project project, String message) {
+        Messages.showErrorDialog(project, message, "错误");
+    }
+
+    private DDLParser.Table parseDDL(Project project, String ddl) {
+        DDLParser.Table table = new DDLParser().parseDDL(ddl);
+        if (table == null || table.getColumns() == null || table.getColumns().isEmpty()) {
+            showError(project, "DDL解析失败或无字段定义");  // 添加project参数
+            return null;
+        }
+        return table;
     }
 
     private String normalizeType(String sqlType) {
@@ -139,20 +146,5 @@ public class GenerateCodeAction extends AnAction {
 
     private void showError(String message) {
         Messages.showErrorDialog(message, "错误");
-    }
-
-    private void showSuccess(String tableName) {
-        String name = Arrays.stream(tableName.split("_"))
-                .filter(part -> !part.isEmpty())
-                .map(part -> part.substring(0, 1).toUpperCase() + part.substring(1).toLowerCase())
-                .collect(Collectors.joining());
-
-        Messages.showInfoMessage(
-                "成功生成:\n" +
-                        "- " + name + "Entity.java\n" +
-                        "- " + name + "Repository.java\n" +
-                        "- " + name + "Service.java",
-                "完成"
-        );
     }
 }

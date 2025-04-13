@@ -1,25 +1,24 @@
-package ${config.layers['application'].components['Service'].basePackage};
 
-import ${config.layers['domain'].components['Repository'].basePackage}.${table.name}Repository;
-import ${config.layers['domain'].components['Entity'].basePackage}.${table.name}Entity;
-import ${config.layers['application'].components['DTO'].basePackage}.${table.name}DTO;
+import ${config.layers['domain'].components['Repository'].basePackage}.${className}Repository;
+import ${config.layers['domain'].components['Entity'].basePackage}.${className}Entity;
+import ${config.layers['application'].components['DTO'].basePackage}.${className}DTO;
 
-public class ${table.name}Service {
-private final ${table.name}Repository repository;
+public class ${className}${componentType} {
+private final ${className}Repository repository;
 
-public ${table.name}Service(${table.name}Repository repository) {
+public ${className}${componentType}(${className}Repository repository) {
 this.repository = repository;
 }
 
-public ${table.name}DTO getById(String id) {
-${table.name}Entity entity = repository.findById(id);
+public ${className}DTO getById(String id) {
+${className}Entity entity = repository.findById(id);
 // TODO: 转换entity为DTO
 return null;
 }
 
-public void save(${table.name}DTO dto) {
+public void save(${className}DTO dto) {
 // TODO: 转换DTO为entity
-${table.name}Entity entity = null;
+${className}Entity entity = null;
 repository.save(entity);
 }
 }
