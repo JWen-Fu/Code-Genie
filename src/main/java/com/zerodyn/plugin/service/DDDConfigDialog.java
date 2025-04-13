@@ -9,7 +9,6 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.zerodyn.plugin.config.ComponentConfig;
 import com.zerodyn.plugin.config.DDDConfiguration;
-import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -26,7 +25,6 @@ import java.util.Objects;
  * @author JWen
  * @since 2025/4/5
  */
-@Slf4j
 public class DDDConfigDialog extends DialogWrapper {
     private final DDDConfiguration config;
     private final Project project;
@@ -50,7 +48,7 @@ public class DDDConfigDialog extends DialogWrapper {
     private void initUI() {
         List<String> modules = getProjectModules();
         if (modules.isEmpty()) {
-            modules.add("");
+            modules.add(""); // 保证至少有一个空选项
         }
 
         // 初始化各层配置
@@ -74,7 +72,7 @@ public class DDDConfigDialog extends DialogWrapper {
         JComboBox<String> moduleCombo = new JComboBox<>(modules.toArray(new String[0]));
         moduleCombo.setSelectedItem(config.getLayer(layer).getModuleName());
         moduleCombo.addActionListener(e ->
-                config.getLayer(layer).setModuleName((String) moduleCombo.getSelectedItem())
+                config.getLayer(layer).setModuleName((String)moduleCombo.getSelectedItem())
         );
         modulePanel.add(moduleCombo);
         contentPanel.add(modulePanel);
@@ -85,7 +83,7 @@ public class DDDConfigDialog extends DialogWrapper {
         componentFields.put(layer, layerFields);
 
         components.entrySet().stream()
-                .filter(entry -> !"ValueObject".equals(entry.getKey()))
+                .filter(entry -> !"ValueObject".equals(entry.getKey())) // 过滤条件
                 .forEach(entry -> {
                     String compType = entry.getKey();
                     ComponentConfig compConfig = entry.getValue();
@@ -145,7 +143,7 @@ public class DDDConfigDialog extends DialogWrapper {
                         .toList();
             }
         } catch (Exception e) {
-            log.error("getProjectModules error", e);
+            e.printStackTrace();
         }
         return Collections.emptyList();
     }
@@ -159,8 +157,16 @@ public class DDDConfigDialog extends DialogWrapper {
         return config;
     }
 
-    private record ConfigUpdater(ComponentConfig config, String field,
-                                 JTextField textField) implements DocumentListener {
+    private class ConfigUpdater implements DocumentListener {
+        private final ComponentConfig config;
+        private final String field;
+        private final JTextField textField;
+
+        public ConfigUpdater(ComponentConfig config, String field, JTextField textField) {
+            this.config = config;
+            this.field = field;
+            this.textField = textField;
+        }
 
         @Override
         public void insertUpdate(DocumentEvent e) {

@@ -95,7 +95,8 @@ public class TypeMappingDialog extends DialogWrapper {
     public Map<String, String> getModifiedMappings() {
         Map<String, String> result = new HashMap<>();
         for (Component comp : mappingPanel.getComponents()) {
-            if (comp instanceof JPanel row) {
+            if (comp instanceof JPanel) {
+                JPanel row = (JPanel) comp;
                 JTextField dbField = (JTextField) row.getComponent(1);
                 JTextField javaField = (JTextField) row.getComponent(4);
                 if (!dbField.getText().trim().isEmpty()) {

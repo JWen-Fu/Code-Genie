@@ -32,7 +32,7 @@ import java.util.Map;
 @Slf4j
 public class CodeGenerator {
     private static final Logger log = LoggerFactory.getLogger(CodeGenerator.class);
-    private final Project project;
+    private final Project project;  // 改为保存Project对象
     private final FieldTypeMapper typeMapper;
     private final boolean useLombok;
     private final DDDConfiguration dddConfig;
@@ -41,15 +41,15 @@ public class CodeGenerator {
     public CodeGenerator(Project project,
                          FieldTypeMapper typeMapper,
                          boolean useLombok,
-                         DDDConfiguration dddConfig) {
-        this.project = project;
+                         DDDConfiguration dddConfig) throws IOException {
+        this.project = project;  // 存储Project对象
         this.typeMapper = typeMapper;
         this.useLombok = useLombok;
         this.dddConfig = dddConfig;
         this.templateManager = TemplateInitializer.createDefaultTemplateManager();
     }
 
-    public void generateDDDCode(DDLParser.Table table) {
+    public void generateDDDCode(DDLParser.Table table) throws IOException {
         Map<String, Map<String, ComponentConfig>> allComponents = dddConfig.getAllValidComponents();
         List<String> layerOrder = Arrays.asList("domain", "application", "infrastructure", "interfaces");
 
@@ -91,13 +91,13 @@ public class CodeGenerator {
                 .resolve("src/main/java");
 
         // 文件名使用转换后的类名
-        String fileName = toCamelCase(table.name()) + toCamelCase(componentType) + ".java";
+        String fileName = toCamelCase(table.getName()) + toCamelCase(componentType) + ".java";
         writeToFile(modulePath, config.getBasePackage(), fileName, content);
     }
 
     private Map<String, Object> createTemplateData(DDLParser.Table table) {
         Map<String, Object> data = new HashMap<>();
-        data.put("className", toCamelCase(table.name()));
+        data.put("className", toCamelCase(table.getName()));
         data.put("table", table);
         data.put("config", dddConfig);
         data.put("typeMapper", typeMapper);
@@ -114,7 +114,6 @@ public class CodeGenerator {
             template.process(data, writer);
             return writer.toString();
         } catch (Exception e) {
-            log.error("Template processing failed", e);
             throw new IOException("Template processing failed: " + templateName, e);
         }
     }
