@@ -29,10 +29,6 @@ public class LayerConfig {
         return Collections.unmodifiableMap(new HashMap<>(components));
     }
 
-    public boolean hasComponents() {
-        return !components.isEmpty();
-    }
-
     public String getModuleName() {
         return moduleName;
     }

@@ -36,19 +36,27 @@ public class GenerateCodeAction extends AnAction {
         try {
             // 1. 获取DDL输入
             String ddl = getDDLFromUser(project);
-            if (ddl == null) return;
+            if (ddl == null) {
+                return;
+            }
 
             // 2. 解析DDL
             DDLParser.Table table = parseDDL(project, ddl);
-            if (table == null) return;
+            if (table == null) {
+                return;
+            }
 
             // 3. 处理类型映射
             FieldTypeMapper typeMapper = handleTypeMappings(project, table);
-            if (typeMapper == null) return;
+            if (typeMapper == null) {
+                return;
+            }
 
             // 4. 配置DDD架构
             DDDConfiguration dddConfig = configureDDD(project);
-            if (dddConfig == null) return;
+            if (dddConfig == null) {
+                return;
+            }
 
             // 5. 生成代码
             generateCode(project, table, typeMapper, dddConfig);
